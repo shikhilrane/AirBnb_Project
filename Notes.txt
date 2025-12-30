@@ -1,1 +1,6 @@
 Requirement Gathering, Schema design, Entity Relationship, and API Design for AirBnb Project
+    AirBnb, Hotel Booking and Management System :
+        Management System - Admins, what admins can do, they can create hotels, they can create rooms, add amenities
+        Hotel Booking - User's perspective, no. of rooms available, which room they can book, also booking from the past
+
+    
