@@ -1,1 +1,471 @@
 Requirement Gathering, Schema design, Entity Relationship, and API Design for AirBnb Project
+    =================================================
+    HOTEL BOOKING SYSTEM (HLD + LLD)
+    =================================================
+
+    Imagine:
+
+    You open MakeMyTrip or Booking.com
+    and search:
+
+    "Hotels in Goa from 10 June to 12 June"
+
+    System should:
+        - Show available hotels
+        - Show room prices
+        - Allow booking
+        - Take payment
+        - Prevent overbooking
+
+    This whole flow is our Hotel Booking System.
+
+
+    =================================================
+    HLD
+    =================================================
+
+
+        =================================================
+        1. ACTORS
+        =================================================
+
+            1. Hotel Manager (Hotel chalane wala) :
+
+                Responsibilities:
+                    - Add hotel
+                    - Add rooms
+                    - Update room count
+                    - Manage bookings
+
+                Example:
+                    Taj Hotel owner adds 20 Deluxe rooms.
+
+        -------------------------------------------------
+
+            2. Guest (Customer) :
+
+                Responsibilities:
+                    - Search hotels
+                    - View rooms
+                    - Book rooms
+                    - Make payment
+
+                Example:
+                    Shikhil wants to book a room in Goa.
+
+
+        =================================================
+        2. HOTEL SEARCH SYSTEM
+        =================================================
+
+            Purpose : Find available hotels.
+
+            Guest enters:
+                - City
+                - Check In Date
+                - Check Out Date
+                - Number Of Rooms
+
+            Example:
+                City = Goa
+                CheckIn = 10 June
+                CheckOut = 12 June
+                Rooms = 2
+
+            System checks Inventory table and returns available hotels.
+
+            Flow:
+                Guest
+                 ↓
+                Search Hotels
+                 ↓
+                Inventory Check
+                 ↓
+                Available Hotels
+
+
+        =================================================
+        3. HOTEL BOOKING SYSTEM
+        =================================================
+
+            Purpose : Create booking.
+
+            Flow:
+                Search Hotel
+                 ↓
+                Select Hotel
+                 ↓
+                Select Room
+                 ↓
+                Check Availability
+                 ↓
+                Add Guests
+                 ↓
+                Payment
+                 ↓
+                Booking Confirmed
+
+            Example:
+                Shikhil selects:
+                    Hotel = Taj Goa
+                    Room = Deluxe
+
+            System verifies room availability.
+
+            If available:
+                    Booking is created.
+
+
+        =================================================
+        4. DYNAMIC PRICING
+        =================================================
+
+            Purpose : Change room price dynamically.
+
+            Base Price : ₹3000
+
+            -------------------------------------------------
+
+            Case 1:
+                Occupancy High
+                (Rooms almost full)
+
+            Price:
+                ₹3000 → ₹4000
+
+            -------------------------------------------------
+
+            Case 2:
+                Holiday
+
+            Price:
+                ₹3000 → ₹5000
+
+            -------------------------------------------------
+
+            Case 3:
+                Last Minute Booking
+
+            Price:
+                ₹3000 → ₹4500
+
+            -------------------------------------------------
+
+            Case 4:
+                Discount Offer
+
+            Price:
+                ₹3000 → ₹2500
+
+            This is implemented using:
+                Strategy Pattern
+                (Har pricing rule alag class me)
+
+
+    =================================================
+    DATABASE DESIGN (LLD)
+    =================================================
+
+
+        =================================================
+        1. USER TABLE
+        =================================================
+
+            Purpose : Login karne wale sab users.
+
+            Fields:
+                id
+                name
+                email
+                password
+                role
+
+            Example:
+                id = 1
+                name = Shikhil
+                role = GUEST
+
+                id = 2
+                name = Rahul
+                role = HOTEL_MANAGER
+
+                One User can create many bookings.
+
+            Relationship:
+                User
+                 |
+                 | 1
+                 |
+                 *
+                Booking
+
+            Meaning : One user has many Booking.
+
+
+        =================================================
+        2. HOTEL TABLE
+        =================================================
+
+            Purpose : Hotel details store karna.
+
+            Fields:
+                id
+                city
+                amenities
+                photos
+                contactInfo
+
+            Example:
+                Taj Hotel
+                City = Goa
+
+            Amenities:
+                - Pool
+                - Gym
+                - Wifi
+
+            Relationship:
+                Hotel
+                 |
+                 | 1
+                 |
+                 *
+                Room
+
+            Meaning : One hotel has many rooms.
+
+
+        =================================================
+        3. CONTACT INFO TABLE
+        =================================================
+
+            Purpose : Hotel contact details.
+
+            Fields:
+                address
+                location
+                email
+                phoneNumber
+
+            Example:
+                Address : Goa Beach Road
+                Phone : 9876543210
+
+            Relationship:
+                Hotel
+                 |
+                 | 1
+                 |
+                 1
+                ContactInfo
+
+            One hotel has one contact info.
+
+
+        =================================================
+        4. ROOM TABLE
+        =================================================
+
+            Purpose : Store room details.
+
+            Fields:
+                id
+                hotelId
+                type
+                basePrice
+                capacity
+                totalCount
+
+            Example:
+                Room Type : Deluxe
+                Price : ₹4000
+                Capacity : 2 People
+                Total Rooms : 20
+
+            Meaning:
+                Taj Hotel has 20 Deluxe Rooms.
+
+
+        =================================================
+        5. INVENTORY TABLE
+        (MOST IMPORTANT TABLE)
+        =================================================
+
+            Purpose : Track room availability.
+
+            Fields:
+                hotelId
+                roomId
+                date
+                totalCount
+                bookedCount
+
+            Example:
+                Date = 10 June
+                Total Deluxe Rooms = 20
+                Booked = 15
+                Available = 5
+
+            Formula:
+                Available = TotalCount - BookedCount
+
+            This table is used by:
+                - Search System
+                - Booking System
+                - Pricing System
+
+            Without Inventory overbooking will happen.
+
+            Example : Only 1 room left.
+
+            Without inventory:
+                Customer A books room Customer B books same room
+                Problem ❌
+                Inventory prevents this.
+
+
+        =================================================
+        6. BOOKING TABLE
+        =================================================
+
+            Purpose : Store booking details.
+
+            Fields:
+                hotelId
+                roomId
+                userId
+                checkInDate
+                checkOutDate
+                status
+                paymentId
+
+            Example :
+                Booking #1001
+                User : Shikhil
+                Hotel : Taj Goa
+                Room : Deluxe
+                Status : CONFIRMED
+
+            Booking Status:
+                PENDING
+                CONFIRMED
+                FAILED
+                CANCELLED
+
+
+        =================================================
+        7. GUEST TABLE
+        =================================================
+
+            Purpose : Store people staying in room.
+
+            Example:
+                Booking done by : Shikhil
+                But room occupants are:
+                    Shikhil
+                    Rahul
+                    Amit
+                All 3 will be stored here.
+
+            Fields:
+                id
+                name
+                gender
+
+
+        =================================================
+        8. BOOKING_GUEST TABLE
+        =================================================
+
+            Purpose : Connect Booking and Guests.
+
+            Example : Booking #1001
+                contains:
+                    Guest1
+                    Guest2
+                    Guest3
+
+            Why needed? Because:
+                One booking can have multiple guests.
+
+
+        =================================================
+        9. PAYMENT TABLE
+        =================================================
+
+            Purpose : Store payment details.
+
+            Fields:
+                transactionId
+                amount
+                status
+
+            Example:
+                Txn : TXN12345
+                Amount : ₹5000
+                Status : SUCCESS
+
+
+        =================================================
+        10. PAYMENT GATEWAY
+        =================================================
+
+            Purpose : Take payment.
+
+            Examples:
+                - Razorpay
+                - Stripe
+                - PayU
+
+            Flow:
+                Booking
+                 ↓
+                Payment Gateway
+                 ↓
+                Transaction Success
+                 ↓
+                Payment Saved
+                 ↓
+                Booking Confirmed
+
+
+    =================================================
+    COMPLETE FLOW
+    =================================================
+
+          Guest
+            ↓
+        Search Hotels
+            ↓
+        Inventory Check
+            ↓
+        Select Hotel
+            ↓
+        Select Room
+            ↓
+        Create Booking
+            ↓
+        Add Guests
+            ↓
+        Payment Gateway
+            ↓
+        Payment Success
+            ↓
+        Booking Confirmed
+            ↓
+        Inventory Updated
+
+
+    =================================================
+    INTERVIEW ANSWER
+    =================================================
+
+        This system has three main modules:
+            1. Hotel Management
+                (Hotel and Room management)
+            2. Hotel Search
+                (Search available hotels)
+            3. Hotel Booking
+                (Booking and Payment)
+
+        The most critical entity is Inventory because it tracks room availability, prevents overbooking, and is used by both search and booking modules.
