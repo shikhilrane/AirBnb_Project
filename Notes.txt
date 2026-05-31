@@ -1,4 +1,4 @@
-Requirement Gathering, Schema design, Entity Relationship, and API Design for AirBnb Project
+1. Requirement Gathering, Schema design, Entity Relationship, and API Design for AirBnb Project
     =================================================
     HOTEL BOOKING SYSTEM (HLD + LLD)
     =================================================
@@ -469,3 +469,214 @@ Requirement Gathering, Schema design, Entity Relationship, and API Design for Ai
                 (Booking and Payment)
 
         The most critical entity is Inventory because it tracks room availability, prevents overbooking, and is used by both search and booking modules.
+
+
+
+
+
+
+
+2. Setup schema and Entity Relationship for the AirBnb Project
+
+    BIG PICTURE :
+        This project is a hotel booking system.
+         (Yeh ek hotel booking system hai.)
+
+        A user searches hotels, selects a room, checks availability, makes payment, and creates a booking.
+         (User hotel search karta hai, room select karta hai, availability check karta hai, payment karta hai aur booking create karta hai.)
+
+        Flow : User → Hotel → Room → Inventory → Payment → Booking
+
+
+    1. User
+        A registered person who uses the platform.
+         (Platform use karne wala registered user.)
+
+        Role:
+            - Login karta hai
+            - Hotels search karta hai
+            - Bookings create karta hai
+            - Guests manage karta hai
+
+    --------------------------------------------------
+
+    2. Guest
+        A person who will stay in the hotel.
+         (Hotel me rehne wala banda.)
+
+        Role:
+            - Booking ke andar stay karne wale log
+            - Family members ya friends ho sakte hain
+            - User inhe save karke rakh sakta hai
+
+    --------------------------------------------------
+
+    3. Hotel
+        A hotel listed on the platform.
+         (Platform par listed hotel.)
+
+        Role:
+            - Hotel details store karta hai
+            - Amenities aur photos store karta hai
+            - Rooms provide karta hai
+
+    --------------------------------------------------
+
+    4. HotelContactInfo
+        Stores hotel contact information.
+         (Hotel ki contact details store karta hai.)
+
+        Role:
+            - Address
+            - Phone Number
+            - Email
+            - Location
+
+    --------------------------------------------------
+
+    5. Room
+        Represents a room category/type.
+         (Room category ko represent karta hai.)
+
+        Role:
+            - Deluxe Room
+            - Suite Room
+            - Standard Room
+
+        Contains:
+            - Price
+            - Capacity
+            - Amenities
+            - Total room count
+
+    --------------------------------------------------
+
+    6. Inventory
+        Stores date-wise room availability and pricing.
+         (Date wise room availability aur pricing store karta hai.)
+
+        Role:
+            - Kitne rooms available hain
+            - Kitne booked hain
+            - Price kya hai
+            - Booking open hai ya closed
+
+        Most important entity for availability.
+         (Room availability ka source of truth.)
+
+    --------------------------------------------------
+
+    7. Payment
+        Represents a payment transaction.
+         (Payment transaction ko represent karta hai.)
+
+        Role:
+            - Amount store karta hai
+            - Transaction ID store karta hai
+            - Payment status track karta hai
+
+    --------------------------------------------------
+
+    8. Booking
+        Represents a hotel reservation.
+         (Hotel reservation ko represent karta hai.)
+
+        Role:
+            - User ko Hotel se connect karta hai
+            - Room reserve karta hai
+            - Guests store karta hai
+            - Payment se connect hota hai
+
+        Heart of the system.
+         (Poore project ki sabse important entity.)
+
+    ==================================================
+    ONE LINE SUMMARY
+    ==================================================
+
+    User → Booking karne wala user
+     (Booking karne wala banda)
+
+    Guest → Hotel me stay karne wala person
+     (Hotel me rehne wala banda)
+
+    Hotel → Property being sold
+     (Jo hotel customer book karta hai)
+
+    Room → Room category
+     (Deluxe, Suite, Standard)
+
+    Inventory → Availability manager
+     (Kitne rooms bache hain ye batata hai)
+
+    Booking → Reservation record
+     (Final booking record)
+
+    Payment → Money transaction record
+     (Paise ka record)
+
+    HotelContactInfo → Hotel contact details
+     (Address aur contact information)
+
+
+    ==================================================
+    COMPLETE BOOKING FLOW
+    ==================================================
+
+        Step 1 :
+            User searches hotels.
+            (User hotel search karta hai.)
+
+        Step 2 :
+            User selects a hotel.
+            (User hotel choose karta hai.)
+
+        Step 3 :
+            User selects a room type.
+            (User room type select karta hai.)
+
+        Step 4 :
+            System checks Inventory.
+             (System inventory check karta hai.)
+            Checks:
+                - Room available?
+                - Price?
+                - Booking open?
+            (Room available hai ya nahi, price kya hai aur booking open hai ya nahi.)
+
+        Step 5 :
+            User selects guests.
+            (User stay karne wale guests select karta hai.)
+
+        Step 6 :
+            Booking record is created.
+             (Booking record create hota hai.)
+            Status : RESERVED
+
+        Step 7 :
+            User makes payment.
+            (User payment karta hai.)
+
+        Step 8 :
+            Payment becomes CONFIRMED.
+            (Payment successful ho jata hai.)
+
+        Step 9 :
+            Booking becomes CONFIRMED.
+            (Booking confirm ho jati hai.)
+
+        Step 10 :
+            Inventory bookedCount increases.
+            (Booked rooms count increase ho jata hai.)
+
+    Flow :
+        -> User (User searches Hotels)
+        -> Hotel (User selects a hotel)
+        -> Room (Select Room type such as Deluxe or Suite)
+        -> Inventory (System checks availability, price, and booking status)
+        -> Guest (User selects or adds guests)
+        -> Booking (Booking record created with status = RESERVED)
+        -> Payment (User completes payment)
+        -> Payment (Transaction ID generated and payment status updated to CONFIRMED)
+        -> Booking (Complete Booking generated with after payment succeed with transaction id)
+        -> Inventory (bookedCount increased and availability updated)
