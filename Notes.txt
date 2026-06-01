@@ -680,3 +680,334 @@
         -> Payment (Transaction ID generated and payment status updated to CONFIRMED)
         -> Booking (Complete Booking generated with after payment succeed with transaction id)
         -> Inventory (bookedCount increased and availability updated)
+
+
+
+
+
+
+
+3. Building the Hotel Manager APIs in Project :
+    Setup the HotelManager APIs to manage -
+        1. Hotel
+        2. Room
+        3. Inventory
+    Response Handlers -
+        1. Manage errors
+        2. Transform API response
+
+    Purpose :
+        Allows Hotel Managers to manage Hotels, Rooms, and Inventory in the system.
+
+    Modules Built :
+        1. Hotel Management
+        2. Room Management
+        3. Inventory Management
+        4. Global Exception Handling
+        5. Standard API Response Handling
+
+    -------------------------------------------------
+
+    1. HOTEL
+    -------------------------------------------------
+
+    Purpose :
+        Represents a hotel listed on the platform.
+
+    Stores :
+        - Hotel details
+        - Amenities
+        - Photos
+        - Contact information
+        - Active/Inactive status
+        - Owner information
+
+    Role in Project :
+        - Main property being sold
+        - Contains multiple room types
+        - Can be activated/deactivated by manager
+
+    Example :
+        Hotel
+            Name  : Taj Hotel
+            City  : Mumbai
+            Owner : Rahul
+
+    -------------------------------------------------
+
+    2. ROOM
+    -------------------------------------------------
+
+    Purpose :
+        Represents a room category inside a hotel.
+
+    Stores :
+        - Room type
+        - Base price
+        - Capacity
+        - Amenities
+        - Photos
+        - Total room count
+
+    Role in Project :
+        - Defines what customer can book
+        - Provides pricing information
+        - Used for inventory generation
+
+    Example :
+        Deluxe Room
+            Price      : ₹5000
+            Capacity   : 3 Guests
+            TotalRooms : 20
+
+    -------------------------------------------------
+
+    3. INVENTORY
+    -------------------------------------------------
+
+    Purpose :
+        Tracks room availability and pricing for each date.
+
+    Stores :
+        - Room availability
+        - Booked rooms
+        - Daily pricing
+        - Surge pricing
+        - Booking status
+
+    Role in Project :
+        - Source of truth for availability
+        - Prevents overbooking
+        - Used during search and booking
+
+    Example :
+
+        Date          : 25 Dec
+        Total Rooms   : 20
+        Booked Rooms  : 15
+        Available     : 5
+
+    -------------------------------------------------
+
+    HOTEL ACTIVATION FLOW
+    -------------------------------------------------
+
+        When Hotel is Inactive :
+
+                Hotel Created
+                      ↓
+                  INACTIVE
+                      ↓
+                Rooms Can Be Added
+                      ↓
+                No Inventory Created
+
+        When Hotel is Activated :
+
+                activateHotel()
+                      ↓
+                Hotel ACTIVE
+                      ↓
+                Generate Inventory
+                      ↓
+                Hotel Available For Booking
+
+    -------------------------------------------------
+
+    ROOM CREATION FLOW
+    -------------------------------------------------
+
+        Create Room
+              ↓
+        Associate With Hotel
+              ↓
+        Save Room
+
+        If Hotel Active
+
+              ↓
+
+        Generate Inventory
+        for Next 1 Year
+
+    -------------------------------------------------
+
+    INVENTORY GENERATION
+    -------------------------------------------------
+
+        Purpose :
+            Creates one inventory record per day
+            for the next 1 year.
+
+        Example :
+            Deluxe Room
+                01-Jan-2026
+                02-Jan-2026
+                03-Jan-2026
+                ...
+                01-Jan-2027
+
+    -------------------------------------------------
+
+    ENTITY RELATIONSHIPS
+    -------------------------------------------------
+
+        User (Hotel Manager)
+                |
+                | 1
+                |
+                *
+              Hotel
+
+        One Manager can manage multiple Hotels.
+
+
+             Hotel
+               |
+               | 1
+               |
+               *
+             Room
+
+        One Hotel can have multiple Room Types.
+
+
+             Room
+               |
+               | 1
+               |
+               *
+            Inventory
+
+        One Room can have multiple Inventory Records.
+
+
+        Example :
+            Taj Hotel
+                |
+                ├── Deluxe Room
+                ├── Suite Room
+                └── Standard Room
+
+        Each Room
+                ↓
+        365+ Inventory Records
+
+    -------------------------------------------------
+
+    CURRENT FLOW
+    -------------------------------------------------
+
+        Hotel Manager
+                ↓
+        Create Hotel
+                ↓
+        Add Rooms
+                ↓
+        Activate Hotel
+                ↓
+        Generate Inventory
+                ↓
+        Hotel Ready For Booking
+
+    -------------------------------------------------
+
+    APIs IMPLEMENTED
+    -------------------------------------------------
+
+        Hotel APIs :
+            POST    /admin/hotels
+            GET     /admin/hotels/{hotelId}
+            PUT     /admin/hotels/{hotelId}
+            DELETE  /admin/hotels/{hotelId}
+            PATCH   /admin/hotels/{hotelId}
+
+        Room APIs :
+            POST    /admin/hotels/{hotelId}/rooms
+            GET     /admin/hotels/{hotelId}/rooms
+            GET     /admin/hotels/{hotelId}/rooms/{roomId}
+            DELETE  /admin/hotels/{hotelId}/rooms/{roomId}
+
+    -------------------------------------------------
+
+    GLOBAL EXCEPTION HANDLER
+    -------------------------------------------------
+
+        Purpose :
+            Handles application exceptions centrally.
+
+        Handles :
+            - ResourceNotFoundException
+            - Validation Errors
+            - Internal Server Errors
+
+        Benefits :
+            - Clean Controllers
+            - Consistent Error Responses
+
+    -------------------------------------------------
+
+    GLOBAL RESPONSE HANDLER
+    -------------------------------------------------
+
+        Purpose :
+            Wraps every API response
+            into a standard format.
+
+        Response Structure :
+            Success
+                {
+                    data : ...
+                    timestamp : ...
+                }
+
+            Error
+                {
+                    error : ...
+                    timestamp : ...
+                }
+
+        Benefits :
+            - Consistent API responses
+            - Easy frontend integration
+
+    -------------------------------------------------
+
+    PROJECT STATUS
+    -------------------------------------------------
+
+        Completed :
+            ✔ Hotel Management
+            ✔ Room Management
+            ✔ Inventory Generation
+            ✔ Hotel Activation
+            ✔ Global Exception Handling
+            ✔ Global Response Handling
+            ✔ DTO Validation
+
+        Next Modules :
+            → Hotel Search
+            → Booking
+            → Guest Management
+            → Payment
+            → Inventory Update During Booking
+            → Dynamic Pricing
+            → Spring Security + JWT
+
+    =================================================
+    CURRENT PROJECT FLOW
+    =================================================
+
+        Hotel Manager
+              ↓
+        Create Hotel
+              ↓
+        Add Room
+              ↓
+        Activate Hotel
+              ↓
+        Generate Inventory For 1 Year
+              ↓
+        Hotel Ready For Booking
+
+    =================================================

@@ -7,6 +7,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Getter
@@ -39,6 +40,12 @@ public class Hotel {
 
     @Column(nullable = false)
     private Boolean active;                 // This will signify that if hotel is active or not
+
+    @ManyToOne
+    private User owner;                     // User who owns and manages this hotel
+
+    @OneToMany(mappedBy = "hotel")
+    private List<Room> rooms;               // All room types available in this hotel
 }
 
 /*
@@ -55,9 +62,12 @@ public class Hotel {
         - Available amenities
         - Contact information
         - Active/Inactive status
+        - Hotel owner/manager
+        - Available room types
         - Audit information (createdAt, updatedAt)
 
     Relationships :
+        - Many Hotels -> One Owner (User)
         - One Hotel -> Many Rooms
         - One Hotel -> Many Inventories
         - One Hotel -> Many Bookings
@@ -66,6 +76,8 @@ public class Hotel {
         Hotel #1
             Name        : Taj Hotel
             City        : Mumbai
+            Owner       : Rahul Sharma
+            Rooms       : Deluxe, Suite, Standard
             Amenities   : WiFi, Pool, Spa, Parking
             Contact     : +91-9876543210
             Status      : Active
@@ -74,6 +86,8 @@ public class Hotel {
         - Hotels can be searched by city
         - Hotels expose available room types
         - Hotels receive bookings through rooms
+        - Hotels are managed by hotel owners/managers
+        - Owners can add, update, and remove rooms
         - Inactive hotels are hidden from customers
 
     Each record in the "hotel" table represents one hotel property.

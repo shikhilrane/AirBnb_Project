@@ -1,6 +1,8 @@
 package com.shikhilrane.project.airBnbApp.entity;
 
 import jakarta.persistence.Embeddable;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,9 +10,17 @@ import lombok.Setter;
 @Setter
 @Embeddable
 public class HotelContactInfo {
+    @NotBlank(message = "Address is required")
     private String address;     // Stores hotel address
+
+    @NotBlank(message = "Phone number is required")
     private String phoneNumber; // Stores hotel contact number
+
+    @Email(message = "Invalid email format")
+    @NotBlank(message = "Email is required")
     private String email;       // Stores hotel email address
+
+    @NotBlank(message = "Location is required")
     private String location;    // Stores hotel location information or coordinates
 }
 
