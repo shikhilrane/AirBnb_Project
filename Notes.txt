@@ -1011,3 +1011,230 @@
         Hotel Ready For Booking
 
     =================================================
+
+
+
+
+
+
+
+4. Search and Booking Functionality added in the AirBnb Project
+    Setup the Guest APIs :
+        1. Search (Paginated API to search, Get Hotel Details : get all rooms)
+        2. Booking (Initiate Booking API, Add guest, Initiate Payments)
+
+        Purpose :
+            Allows guests to search hotels,
+            view hotel details,
+            create bookings,
+            add guests,
+            and reserve inventory.
+
+        -------------------------------------------------
+            1. HOTEL SEARCH
+        -------------------------------------------------
+
+            Purpose :
+                Find hotels having available rooms for the requested stay duration.
+
+            Search Parameters :
+                - City
+                - Check-In Date
+                - Check-Out Date
+                - Rooms Count
+
+            Example :
+                City       : Mumbai
+                Check-In   : 10 Jun
+                Check-Out  : 12 Jun
+                Rooms      : 2
+
+            Search Flow :
+                Guest
+                    ↓
+                Search Hotels
+                    ↓
+                Inventory Check
+                    ↓
+                Available Hotels
+                    ↓
+                Paginated Result
+
+            Inventory Validation :
+                Available Rooms =
+                    Total Rooms
+                    - Booked Rooms
+                    - Reserved Rooms
+
+        -------------------------------------------------
+            2. HOTEL DETAILS
+        -------------------------------------------------
+
+            Purpose :
+                Show complete hotel information along with all available room types.
+
+            Returns :
+                - Hotel Details
+                - Amenities
+                - Photos
+                - Contact Information
+                - Room Details
+
+            Flow :
+                Select Hotel
+                        ↓
+                Get Hotel Details
+                        ↓
+                HotelInfoDto
+                        ↓
+                Hotel + Rooms
+
+        -------------------------------------------------
+            3. BOOKING INITIALIZATION
+        -------------------------------------------------
+
+            Purpose :
+                Create a temporary reservation before payment.
+
+            Flow :
+                Select Hotel
+                        ↓
+                Select Room
+                        ↓
+                Check Availability
+                        ↓
+                Lock Inventory
+                        ↓
+                Reserve Inventory
+                        ↓
+                Create Booking
+                        ↓
+                    RESERVED
+
+            Inventory Reservation :
+                reservedCount += roomsCount
+
+        -------------------------------------------------
+            4. INVENTORY LOCKING
+        -------------------------------------------------
+
+            Purpose :
+                Prevent overbooking.
+
+            Lock Type :
+                PESSIMISTIC_WRITE
+
+            Example :
+                User A
+                    ↓
+                Locks Inventory
+                    ↓
+                Creates Booking
+
+                User B
+                    ↓
+                Waits For Lock
+
+            Result :
+                Prevents simultaneous booking
+                of the same room inventory.
+
+        -------------------------------------------------
+            5. ADD GUESTS
+        -------------------------------------------------
+
+            Purpose :
+                Add guest details after booking creation.
+
+            Validation :
+                - Booking must exist
+                - Booking must not expire
+                - Booking status must be RESERVED
+
+            Flow :
+                Booking Created
+                        ↓
+                    RESERVED
+                        ↓
+                  Add Guests
+                        ↓
+                GUESTS_ADDED
+
+        -------------------------------------------------
+            6. BOOKING EXPIRY
+        -------------------------------------------------
+
+            Purpose :
+                Prevent holding inventory forever.
+
+            Rule :
+                Booking expires after 10 minutes.
+
+            Flow :
+                Booking Created
+                        ↓
+                    RESERVED
+                        ↓
+                    10 Minutes
+                        ↓
+                    Expired
+
+        -------------------------------------------------
+            APIS IMPLEMENTED
+        -------------------------------------------------
+
+            Search APIs :
+
+                GET /hotels/search
+
+                GET /hotels/{hotelId}/info
+
+            Booking APIs :
+
+                POST /bookings/init
+
+                POST /bookings/{bookingId}/addGuests
+
+        -------------------------------------------------
+
+            CURRENT BOOKING FLOW
+        -------------------------------------------------
+
+                Guest
+                    ↓
+                Search Hotels
+                    ↓
+                Select Hotel
+                    ↓
+                View Hotel Details
+                    ↓
+                Select Room
+                    ↓
+                Initialize Booking
+                    ↓
+                Inventory Locked
+                    ↓
+                Booking Created
+                    ↓
+                 RESERVED
+                    ↓
+                Add Guests
+                    ↓
+                GUESTS_ADDED
+                    ↓
+                Payment (Next Module)
+                    ↓
+                CONFIRMED
+
+        -------------------------------------------------
+            PROJECT STATUS
+        -------------------------------------------------
+
+            Completed :
+                ✔ Hotel Search
+                ✔ Hotel Details API
+                ✔ Booking Initialization
+                ✔ Inventory Locking
+                ✔ Guest Addition
+                ✔ Booking Expiry Validation
+                ✔ DTO Validation

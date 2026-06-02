@@ -1,6 +1,8 @@
 package com.shikhilrane.project.airBnbApp.service.impl;
 
 import com.shikhilrane.project.airBnbApp.dto.HotelDto;
+import com.shikhilrane.project.airBnbApp.dto.HotelInfoDto;
+import com.shikhilrane.project.airBnbApp.dto.RoomDto;
 import com.shikhilrane.project.airBnbApp.entity.Hotel;
 import com.shikhilrane.project.airBnbApp.entity.Room;
 import com.shikhilrane.project.airBnbApp.exception.ResourceNotFoundException;
@@ -12,6 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -83,6 +88,21 @@ public class HotelServiceImpl implements HotelService {
             inventoryService.initializeRoomForAYear(room);
         }
     }
+
+    @Override
+    public HotelInfoDto getHotelInfoById(Long hotelId) {
+        log.info("Getting Hotel with ID: {}", hotelId);
+        Hotel hotel = hotelRepository
+                .findById(hotelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: " + hotelId));   // Fetches hotel or throws exception
+
+        List<RoomDto> rooms = hotel.getRooms()
+                .stream()
+                .map((element) -> modelMapper.map(element, RoomDto.class))
+                .toList();                                                                                  // Converts all room entities into DTOs
+
+        return new HotelInfoDto(modelMapper.map(hotel, HotelDto.class), rooms);                             // Returns hotel details with room details
+    }
 }
 
 /*
@@ -120,15 +140,29 @@ public class HotelServiceImpl implements HotelService {
                 - Generates one year of inventory records for all hotel rooms
                 - Makes hotel available for booking
 
+            getHotelInfoById()
+                - Fetches complete hotel information
+                - Returns hotel details along with all room details
+
             validateHotelExists()
                 - Checks whether a hotel exists
                 - Throws exception if hotel is not found
+
+        Responsibilities :
+            - Create a new hotel
+            - Get hotel details by ID
+            - Get complete hotel information
+            - Update hotel information
+            - Delete a hotel
+            - Activate a hotel
+            - Validate hotel existence
 
         Business Use :
             - Handles hotel management operations
             - Applies business rules before database operations
             - Converts DTOs into entities and vice versa
             - Controls hotel activation lifecycle
+            - Provides complete hotel and room information
             - Throws meaningful exceptions when hotel is not found
             - Automatically generates inventory when a hotel is activated
             - Removes room inventory before hotel deletion

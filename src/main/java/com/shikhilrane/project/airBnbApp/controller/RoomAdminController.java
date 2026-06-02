@@ -18,24 +18,28 @@ import java.util.List;
 public class RoomAdminController {
     private final RoomService roomService;
 
+    // 1. Create a new room in a hotel
     @PostMapping
     public ResponseEntity<RoomDto> createNewRoom(@Valid @RequestBody RoomDto roomDto, @PathVariable Long hotelId){
         RoomDto newRoom = roomService.createNewRoom(hotelId, roomDto);              // Creates a new room in the hotel
         return new ResponseEntity<>(newRoom, HttpStatus.CREATED);                   // Returns created room with 201 status
     }
 
+    // 2. Get all rooms of a hotel
     @GetMapping
     public ResponseEntity<List<RoomDto>> getAllRooms(@PathVariable Long hotelId){
         List<RoomDto> allRoomsInHotel = roomService.getAllRoomsInHotel(hotelId);    // Fetches all rooms of the hotel
         return ResponseEntity.ok(allRoomsInHotel);                                  // Returns room list with 200 status
     }
 
+    // 3. Get room details by room ID
     @GetMapping(path = "/{roomId}")
     public ResponseEntity<RoomDto> getRoomByHotelId(@PathVariable Long roomId){
         RoomDto roomById = roomService.getRoomById(roomId);                         // Fetches room details by room ID
         return ResponseEntity.ok(roomById);                                         // Returns room data with 200 status
     }
 
+    // 4. Delete room by room ID
     @DeleteMapping(path = "/{roomId}")
     public ResponseEntity<Void> deleteRoomByRoomId(@PathVariable Long roomId){
         roomService.deleteRoomById(roomId);                                         // Deletes room by ID

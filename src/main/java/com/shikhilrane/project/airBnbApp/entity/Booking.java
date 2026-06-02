@@ -2,11 +2,11 @@ package com.shikhilrane.project.airBnbApp.entity;
 
 import com.shikhilrane.project.airBnbApp.entity.enums.BookingStatus;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -14,6 +14,9 @@ import java.util.Set;
 @Entity
 @Setter
 @Getter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class Booking {
 
     @Id
@@ -47,10 +50,6 @@ public class Booking {
     @UpdateTimestamp
     private LocalDateTime updatedAt;                        // Timestamp when booking was last updated
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "payment_id")
-    private Payment payment;                                // Payment associated with this booking
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private BookingStatus bookingStatus;                    // Current booking status (PENDING, CONFIRMED, CANCELLED, etc.)
@@ -62,6 +61,12 @@ public class Booking {
             inverseJoinColumns = @JoinColumn(name = "guest_id")
     )
     private Set<Guest> guests;                              // Guests staying under this booking
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal amount;                              // Total booking amount payable by the user
+
+    @Column(unique = true)
+    private String paymentSessionId;                        // Unique payment session identifier for payment tracking
 }
 
 /*
@@ -77,9 +82,10 @@ public class Booking {
         - User who made the booking
         - Number of rooms booked
         - Check-in and check-out dates
-        - Payment information
-        - Booking status
         - Guest details
+        - Booking amount
+        - Payment session information
+        - Booking status
         - Audit information (createdAt, updatedAt)
 
     Relationships :
@@ -93,20 +99,23 @@ public class Booking {
 
         Booking #101
 
-            User          : Rahul
-            Hotel         : Taj Hotel
-            Room          : Deluxe Room
-            Rooms         : 2
-            Check-In      : 10 Jan 2026
-            Check-Out     : 12 Jan 2026
-            Guests        : Rahul, Priya, Aman
-            Payment       : ₹12,000
-            Booking Status: CONFIRMED
+            User             : Rahul
+            Hotel            : Taj Hotel
+            Room             : Deluxe Room
+            Rooms            : 2
+            Check-In         : 10 Jan 2026
+            Check-Out        : 12 Jan 2026
+            Guests           : Rahul, Priya, Aman
+            Amount           : ₹12,000
+            Payment Session  : ps_abc123xyz
+            Booking Status   : CONFIRMED
 
     Business Use :
-        - Represents a confirmed or pending reservation
+        - Represents a hotel reservation
         - Connects users with hotels and room types
         - Tracks stay duration and guest information
+        - Stores booking amount payable by user
+        - Links booking with payment session
         - Maintains booking lifecycle and payment status
         - Acts as the primary record for hotel reservations
 
@@ -131,6 +140,8 @@ public class Booking {
     Note :
         - One booking can contain multiple guests.
         - One booking is associated with a single hotel and room type.
+        - Amount stores total booking cost.
+        - paymentSessionId is used to track payment transactions.
         - Availability is validated using Inventory records before booking creation.
 
     Each record in the "booking" table represents one hotel reservation.

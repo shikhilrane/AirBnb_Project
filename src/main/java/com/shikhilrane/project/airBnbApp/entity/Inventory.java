@@ -40,6 +40,9 @@ public class Inventory {
     @Column(nullable = false, columnDefinition = "INTEGER DEFAULT 0")   // Starts with default value as 0
     private Integer bookedCount;                                        // Number of rooms already booked
 
+    @Column(nullable = false, columnDefinition = "INTEGER DEFAULT 0")
+    private Integer reservedCount;                                      // Number of rooms temporarily reserved before confirmation
+
     @Column(nullable = false)
     private Integer totalCount;                                         // Total rooms available for booking
 
@@ -74,6 +77,7 @@ public class Inventory {
         - Room information
         - Inventory date
         - Number of booked rooms
+        - Number of reserved rooms
         - Total available rooms
         - Surge pricing multiplier
         - Final room price
@@ -86,29 +90,38 @@ public class Inventory {
         - Many Inventory Records -> One Room
 
     Example :
+
         Inventory #101
-            Hotel         : Taj Hotel
-            Room          : Deluxe Room
-            Date          : 25 Dec 2026
-            Total Rooms   : 20
-            Booked Rooms  : 15
-            Available     : 5
-            Surge Factor  : 1.50
-            Final Price   : ₹7500
-            Status        : Open
+
+            Hotel          : Taj Hotel
+            Room           : Deluxe Room
+            Date           : 25 Dec 2026
+            Total Rooms    : 20
+            Booked Rooms   : 10
+            Reserved Rooms : 5
+            Available      : 5
+            Surge Factor   : 1.50
+            Final Price    : ₹7500
+            Status         : Open
 
     Business Use :
         - Maintains room availability for each date
+        - Tracks booked and reserved rooms separately
         - Prevents overbooking
         - Supports dynamic pricing based on demand
         - Powers hotel search and booking flows
         - Acts as the source of truth for room availability
 
+    Availability Formula :
+        Available Rooms =
+            Total Rooms
+            - Booked Rooms
+            - Reserved Rooms
+
     Note :
-        - One inventory record exists for a specific
-          Hotel + Room + Date combination.
-        - Duplicate inventory records are prevented
-          using a unique constraint.
+        - One inventory record exists for a specific Hotel + Room + Date combination.
+        - reservedCount stores temporarily reserved rooms before booking confirmation.
+        - Duplicate inventory records are prevented using a unique constraint.
 
     Example Unique Key :
 

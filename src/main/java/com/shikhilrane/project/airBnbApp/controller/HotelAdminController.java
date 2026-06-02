@@ -45,7 +45,7 @@ public class HotelAdminController {
     }
 
     // 5. Activate hotel and make it available for booking
-    @PatchMapping("/{hotelId}")
+    @PatchMapping("/{hotelId}/activate")
     public ResponseEntity<Void> activateHotel(@PathVariable Long hotelId) {
         hotelService.activateHotel(hotelId);                                                // Changes hotel status from inactive to active
         return ResponseEntity.noContent().build();                                          // Returns 204 No Content

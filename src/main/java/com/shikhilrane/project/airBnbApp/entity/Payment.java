@@ -33,6 +33,9 @@ public class Payment {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;                    // Timestamp when payment record was last updated
+
+    @OneToOne(fetch = FetchType.LAZY)
+    private Booking booking;                            // Booking associated with this payment
 }
 
 /*
@@ -42,23 +45,27 @@ public class Payment {
               Stores transaction details, payment amount,
               and the current payment status.
 
-    This entity stores :
+        This entity stores :
         - Unique transaction identifier
         - Payment status
         - Payment amount
+        - Associated booking
         - Audit information (createdAt, updatedAt)
 
     Relationships :
         - One Payment -> One Booking
+        - One Booking -> One Payment
 
     Example :
         Payment #501
             Transaction ID : TXN_ABC123XYZ
+            Booking ID     : 101
             Amount         : ₹12,000
             Status         : SUCCESS
 
     Business Use :
         - Tracks payment transactions for bookings.
+        - Links payments with bookings.
         - Maintains payment status throughout the payment lifecycle.
         - Helps prevent duplicate payments using transaction IDs.
         - Provides payment history for audits and reporting.
@@ -86,18 +93,21 @@ public class Payment {
 
         Successful Payment
 
+            Booking ID     : 101
             Amount         : ₹8,500
             Transaction ID : TXN_12345
             Status         : SUCCESS
 
         Failed Payment
 
+            Booking ID     : 102
             Amount         : ₹8,500
             Transaction ID : TXN_67890
             Status         : FAILED
 
     Note :
         - Transaction ID must be unique.
+        - One payment belongs to exactly one booking.
         - Amount is stored using BigDecimal for accurate monetary calculations.
         - A booking is typically confirmed only after successful payment.
 
