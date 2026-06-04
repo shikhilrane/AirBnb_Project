@@ -2,6 +2,7 @@ package com.shikhilrane.project.airBnbApp.controller;
 
 import com.shikhilrane.project.airBnbApp.dto.HotelDto;
 import com.shikhilrane.project.airBnbApp.dto.HotelInfoDto;
+import com.shikhilrane.project.airBnbApp.dto.HotelPriceDto;
 import com.shikhilrane.project.airBnbApp.dto.HotelSearchReuestDto;
 import com.shikhilrane.project.airBnbApp.service.HotelService;
 import com.shikhilrane.project.airBnbApp.service.InventoryService;
@@ -21,11 +22,11 @@ public class HotelSearchGuestController {
     private final InventoryService inventoryService;
     private final HotelService hotelService;
 
-    // 1. Search hotels based on city, dates, and room count
+    // 1. Search hotels based on city, dates, room count, and pricing
     @GetMapping(path = "/search")
-    public ResponseEntity<Page<HotelDto>> searchHotels(@Valid @RequestBody HotelSearchReuestDto hotelSearchReuestDto){
-        Page<HotelDto> page = inventoryService.searchHotels(hotelSearchReuestDto);                                  // Searches available hotels
-        return ResponseEntity.ok(page);                                                                             // Returns paginated hotel list
+    public ResponseEntity<Page<HotelPriceDto>> searchHotels(@Valid @RequestBody HotelSearchReuestDto hotelSearchReuestDto) {
+        var page = inventoryService.searchHotels(hotelSearchReuestDto);   // Searches hotels and returns pricing information
+        return ResponseEntity.ok(page);                                   // Returns paginated hotel list with prices
     }
 
     // 2. Get complete hotel information by hotel ID
@@ -43,6 +44,7 @@ public class HotelSearchGuestController {
         Responsibilities :
             - Search available hotels
             - View hotel details
+            - Return hotel pricing information
 
         Endpoints :
 
@@ -52,9 +54,11 @@ public class HotelSearchGuestController {
                     • Check-in date
                     • Check-out date
                     • Required room count
+                - Returns hotel details with average pricing
 
             GET /hotels/{hotelId}/info
                 - Returns complete hotel information
+                - Returns room details
 
         Flow :
 
@@ -73,18 +77,38 @@ public class HotelSearchGuestController {
             Search Hotels
                 GET /hotels/search
 
+            Response :
+
+                Hotel Name : Hotel Lotus
+                Price      : ₹575
+
             Get Hotel Details
                 GET /hotels/1/info
 
         Business Use :
-            - Allows guests to find available hotels
-            - Displays hotel details before booking
-            - Supports hotel discovery and booking flow
+            - Allows guests to search hotels.
+            - Displays hotel pricing information.
+            - Displays hotel and room details.
+            - Supports hotel booking flow.
+
+        Search Flow :
+
+            City + Dates + Rooms
+                    ↓
+            Hotel Search
+                    ↓
+            HotelMinPrice
+                    ↓
+            HotelPriceDto
+                    ↓
+            API Response
 
         Note :
-            - Search results are returned in paginated format.
-            - Only hotels with available inventory are returned.
+            - Search results are paginated.
+            - Only active hotels are returned.
+            - Pricing is fetched from HotelMinPrice table.
             - Controller contains no business logic.
 
-        This controller is responsible for hotel discovery features.
+        This controller is responsible for hotel search
+        and hotel information APIs.
 */

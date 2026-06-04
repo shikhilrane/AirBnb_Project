@@ -17,8 +17,11 @@ import java.util.List;
 
 @Repository
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
-    void deleteByRoom(Room room);       // Deletes all inventory records associated with a room
 
+    // Deletes all inventory records associated with a room
+    void deleteByRoom(Room room);
+
+    // Finds hotels with enough available rooms for the complete stay duration
     @Query("""
             SELECT DISTINCT i.hotel
             FROM Inventory i
@@ -38,6 +41,7 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
             Pageable pageable
     );
 
+    // Finds and locks inventory records before booking creation
     @Query("""
             SELECT i
             FROM Inventory i
@@ -53,7 +57,55 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
             @Param("endDate") LocalDate endDate,
             @Param("roomsCount") Integer roomsCount
     );
+
+    // Fetches inventory records of a hotel for a given date range
+    List<Inventory> findByHotelAndDateBetween(Hotel hotel, LocalDate startDate, LocalDate endDate);
 }
+
+/*
+    InventoryRepository
+
+        Purpose :
+            Provides database operations
+            for Inventory records.
+
+        Responsibilities :
+            - Save inventory records
+            - Delete inventory records
+            - Lock inventory during booking
+            - Fetch inventory for pricing updates
+
+        Methods :
+
+            deleteByRoom()
+                - Deletes all inventory records
+                  associated with a room
+
+            findHotelsWithAvailableInventory()
+                - Finds hotels having available rooms
+                - Checks availability for complete stay duration
+                - Returns paginated hotel list
+
+            findAndLockAvailableInventory()
+                - Finds available inventory records
+                - Locks inventory during booking
+                - Prevents overbooking
+
+            findByHotelAndDateBetween()
+                - Fetches inventory records
+                  for a hotel and date range
+                - Used by pricing scheduler
+
+        Business Use :
+            - Manages room availability.
+            - Supports hotel search.
+            - Supports booking flow.
+            - Prevents overbooking.
+            - Supports dynamic pricing updates.
+
+        This repository acts as the data access layer
+        for inventory management.
+*/
 
 /*
     findHotelsWithAvailableInventory Query :

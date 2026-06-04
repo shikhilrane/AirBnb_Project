@@ -1,10 +1,12 @@
 package com.shikhilrane.project.airBnbApp.service.impl;
 
 import com.shikhilrane.project.airBnbApp.dto.HotelDto;
+import com.shikhilrane.project.airBnbApp.dto.HotelPriceDto;
 import com.shikhilrane.project.airBnbApp.dto.HotelSearchReuestDto;
 import com.shikhilrane.project.airBnbApp.entity.Hotel;
 import com.shikhilrane.project.airBnbApp.entity.Inventory;
 import com.shikhilrane.project.airBnbApp.entity.Room;
+import com.shikhilrane.project.airBnbApp.repository.HotelMinPriceRepository;
 import com.shikhilrane.project.airBnbApp.repository.InventoryRepository;
 import com.shikhilrane.project.airBnbApp.service.InventoryService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ import java.time.temporal.ChronoUnit;
 public class InventoryServiceImpl implements InventoryService {
     private final InventoryRepository inventoryRepository;
     private final ModelMapper modelMapper;
+    private final HotelMinPriceRepository hotelMinPriceRepository;
 
     @Override
     public void initializeRoomForAYear(Room room) {
@@ -52,20 +55,23 @@ public class InventoryServiceImpl implements InventoryService {
         inventoryRepository.deleteByRoom(room);            // Deletes all inventory records associated with the room
     }
 
+    // Searches hotels and returns hotel pricing information
     @Override
-    public Page<HotelDto> searchHotels(HotelSearchReuestDto hotelSearchReuestDto) {
+    public Page<HotelPriceDto> searchHotels(HotelSearchReuestDto hotelSearchReuestDto) {
         log.info("Searching hotels for {} city, from {} to {}", hotelSearchReuestDto.getCity(), hotelSearchReuestDto.getStartDate(), hotelSearchReuestDto.getEndDate());
         Pageable pageable = PageRequest.of(hotelSearchReuestDto.getPage(), hotelSearchReuestDto.getSize());             // Creates pagination configuration
         long dateCount =
                 ChronoUnit.DAYS.between(hotelSearchReuestDto.getStartDate(), hotelSearchReuestDto.getEndDate()) + 1;    // Calculates total stay duration in days
-        Page<Hotel> hotelPage = inventoryRepository.findHotelsWithAvailableInventory(
+
+        // business logic - 90 days
+        Page<HotelPriceDto> hotelPage = hotelMinPriceRepository.findHotelsWithAvailableInventory(
                 hotelSearchReuestDto.getCity(),             // City where user wants hotel
                 hotelSearchReuestDto.getStartDate(),        // Check-in date
                 hotelSearchReuestDto.getEndDate(),          // Check-out date
                 hotelSearchReuestDto.getRoomsCount(),       // Number of rooms required
                 dateCount,                                  // Total stay days
                 pageable);                                  // Pagination details
-        return hotelPage.map((element) -> modelMapper.map(element, HotelDto.class)); // Converts Hotel entities into HotelDto objects and returns paginated result
+        return hotelPage; // Converts Hotel entities into HotelDto objects and returns paginated result
     }
 }
 
@@ -73,36 +79,36 @@ public class InventoryServiceImpl implements InventoryService {
     InventoryServiceImpl
 
         Purpose : Manages inventory-related business operations.
-                  Handles inventory creation, deletion, and hotel availability search.
+                  Handles inventory creation, deletion, and hotel search.
 
         Responsibilities :
-            - Generate inventory for rooms
-            - Delete room inventory
-            - Search hotels based on availability
+            - Generate inventory records
+            - Delete inventory records
+            - Search hotels
+            - Manage room availability
 
         Methods :
 
             initializeRoomForAYear()
-                - Creates inventory records for next 1 year
-                - Generates one inventory entry per day
-                - Initializes pricing and room availability
+                - Creates inventory for next 1 year
+                - Generates one inventory record per day
+                - Initializes room availability and pricing
 
             deleteFutureInventories()
-                - Deletes all inventory records
-                  associated with a room
+                - Deletes inventory associated with a room
 
             searchHotels()
                 - Searches hotels by city
-                - Checks room availability for date range
+                - Filters hotels by date range
+                - Returns hotel pricing information
                 - Supports pagination
-                - Returns only available hotels
 
         Business Use :
-            - Maintains day-wise room inventory
-            - Supports hotel search functionality
-            - Tracks room availability
-            - Prevents overbooking
-            - Provides inventory data for bookings
+            - Maintains day-wise room inventory.
+            - Supports hotel availability management.
+            - Provides hotel search functionality.
+            - Supplies inventory data for bookings.
+            - Uses pre-calculated hotel pricing for faster searches.
 
         Search Flow :
 
@@ -114,30 +120,41 @@ public class InventoryServiceImpl implements InventoryService {
                     +
               Required Rooms
                     ↓
-            Inventory Search
+            HotelMinPrice Search
                     ↓
-            Available Hotels
+            Average Hotel Price
                     ↓
-               HotelDto Page
+            HotelPriceDto Page
 
         Inventory Generation Flow :
 
-            Room Activated
+            Room Created
                     ↓
             initializeRoomForAYear()
                     ↓
             Create Inventory
               For Each Day
                     ↓
-               Next 365 Days
+               Next 366 Days
+
+        Example :
+
+            Room Created
+                    ↓
+            Inventory Generated
+                    ↓
+            04 Jun 2026
+            05 Jun 2026
+            06 Jun 2026
+            ...
+            03 Jun 2027
 
         Note :
             - One inventory record exists for each
-              Room + Date combination.
-            - Hotel search uses inventory records
-              instead of room records.
+              Hotel + Room + Date combination.
+            - Search uses HotelMinPrice table for better performance.
             - Search results are paginated.
+            - Inventory stores availability and pricing information.
 
-        This class acts as the business layer
-        for inventory management and hotel search.
+        This class acts as the business layer for inventory management and hotel search.
 */

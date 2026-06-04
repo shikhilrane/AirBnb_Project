@@ -1238,3 +1238,303 @@
                 ✔ Guest Addition
                 ✔ Booking Expiry Validation
                 ✔ DTO Validation
+
+
+
+
+
+
+
+5. Dynamic Hotel Pricing and Scheduling in AirBnb Project
+    Dynamic Pricing :
+        1. Decorator Design Pattern
+        2. Scheduler to Update pricing every hour
+    Booking :
+        1. Initiate Booking API
+        2. Add Guests
+        3. Initiate Payments
+        4. Capture Payment
+
+    -------------------------------------------------
+        PRICING STRATEGY DESIGN
+    -------------------------------------------------
+
+        Purpose :
+            Provide a flexible way to calculate room prices.
+
+        Design Pattern :
+            Strategy Pattern
+                +
+            Decorator Pattern
+
+        Benefit :
+            New pricing rules can be added without modifying existing code.
+
+    -------------------------------------------------
+        1. PricingStrategy
+    -------------------------------------------------
+
+        Purpose :
+            Defines the pricing contract.
+
+        Method :
+            calculatePrice(Inventory inventory)
+
+        Responsibility :
+            - Accept inventory
+            - Return calculated room price
+
+        Flow :
+            Inventory
+                ↓
+            PricingStrategy
+                ↓
+            Price
+
+    -------------------------------------------------
+        2. BasePricingStrategy
+    -------------------------------------------------
+
+        Purpose :
+            Returns the room's base price.
+
+        Example :
+            Room Base Price = ₹400
+            Result = ₹400
+
+        Responsibility :
+            - Starting point of pricing chain
+            - Provides default room price
+
+    -------------------------------------------------
+        3. SurgePricingStrategy
+    -------------------------------------------------
+
+        Purpose :
+            Applies surge factor.
+
+        Formula :
+            Price × Surge Factor
+
+        Example :
+            ₹400 × 1.50
+            Result = ₹600
+
+        Responsibility :
+            - Handle demand-based pricing
+            - Increase or decrease room price
+
+    -------------------------------------------------
+        4. OccupancyPricingStrategy
+    -------------------------------------------------
+
+        Purpose :
+            Increase price when occupancy is high.
+
+        Formula :
+            Occupancy = Booked Rooms / Total Rooms
+
+        Rule :
+            Occupancy > 80%
+                ↓
+            Price + 20%
+
+        Example :
+            Occupancy = 85%
+            ₹400 → ₹480
+
+    -------------------------------------------------
+        5. UrgencyPricingStrategy
+    -------------------------------------------------
+
+        Purpose :
+            Increase price for near-future bookings.
+
+        Rule :
+            Booking Date : Within Next 7 Days
+            Price + 15%
+
+        Example :
+            ₹400 → ₹460
+
+    -------------------------------------------------
+        6. HolidayPricingStrategy
+    -------------------------------------------------
+
+        Purpose :
+            Increase price on holidays.
+
+        Rule :
+            Holiday
+                ↓
+            Price + 25%
+
+        Example :
+            ₹400 → ₹500
+
+        Future Improvement :
+            Connect with Holiday API
+
+    -------------------------------------------------
+        7. PricingService
+    -------------------------------------------------
+
+        Purpose :
+            Central pricing engine.
+
+        Responsibility :
+            - Create pricing chain
+            - Execute all pricing strategies
+            - Return final room price
+
+        Pricing Chain :
+            BasePricingStrategy
+                    ↓
+            SurgePricingStrategy
+                    ↓
+            OccupancyPricingStrategy
+                    ↓
+            UrgencyPricingStrategy
+                    ↓
+            HolidayPricingStrategy
+                    ↓
+                Final Price
+
+        Example :
+            Base Price = ₹400
+                    ↓
+            Urgency +15%
+                    ↓
+            Holiday +25%
+                    ↓
+            Final Price = ₹575
+
+    -------------------------------------------------
+        HOTEL MIN PRICE
+    -------------------------------------------------
+
+        Purpose :
+            Store cheapest room price
+            for each hotel and date.
+
+        Example :
+            Deluxe Room   = ₹800
+            Suite Room    = ₹1200
+            Standard Room = ₹600
+
+            Stored Price : ₹600
+
+        Benefit :
+            Faster hotel search
+
+    -------------------------------------------------
+        PRICING UPDATE SERVICE
+    -------------------------------------------------
+
+        Purpose :
+            Update inventory prices and hotel minimum prices.
+
+        Responsibilities :
+            - Update Inventory prices
+            - Update HotelMinPrice records
+            - Run scheduler
+
+        Flow :
+            Hotel
+                ↓
+            Inventory
+                ↓
+            Dynamic Pricing
+                ↓
+            Inventory Update
+                ↓
+            HotelMinPrice Update
+
+    -------------------------------------------------
+        PRICING SCHEDULER
+    -------------------------------------------------
+
+        Purpose :
+            Automatically refresh prices.
+
+        Schedule :
+            Every Hour
+
+        Flow :
+            Scheduler
+                ↓
+            Fetch Hotels
+                ↓
+            Fetch Inventory
+                ↓
+            Calculate Prices
+                ↓
+            Update Inventory
+                ↓
+            Update HotelMinPrice
+
+    -------------------------------------------------
+        SEARCH OPTIMIZATION
+    -------------------------------------------------
+
+        Before :
+            Search
+                ↓
+            Inventory Table
+                ↓
+            Calculate Prices
+
+        After :
+            Search
+                ↓
+            HotelMinPrice Table
+                ↓
+            HotelPriceDto
+
+        Benefit :
+            Faster Searches
+            Less Database Load
+
+    -------------------------------------------------
+        COMPLETE PRICING FLOW
+    -------------------------------------------------
+
+            Room
+                ↓
+            Base Price
+                ↓
+            Pricing Strategies
+                ↓
+            Final Dynamic Price
+                ↓
+            Inventory.price
+                ↓
+            HotelMinPrice
+                ↓
+            Hotel Search
+                ↓
+            Guest Sees Price
+
+                OR
+
+            PricingStrategy
+                ↓
+            BasePricingStrategy
+                ↓
+            SurgePricingStrategy
+                ↓
+            OccupancyPricingStrategy
+                ↓
+            UrgencyPricingStrategy
+                ↓
+            HolidayPricingStrategy
+                ↓
+            PricingService
+                ↓
+            PricingUpdateServiceImpl
+                ↓
+            Scheduler
+                ↓
+            HotelMinPrice
+                ↓
+            Hotel Search
