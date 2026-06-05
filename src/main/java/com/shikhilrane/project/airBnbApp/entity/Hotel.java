@@ -41,7 +41,7 @@ public class Hotel {
     @Column(nullable = false)
     private Boolean active;                 // This will signify that if hotel is active or not
 
-    @ManyToOne
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private User owner;                     // User who owns and manages this hotel
 
     @OneToMany(mappedBy = "hotel")
@@ -89,6 +89,32 @@ public class Hotel {
         - Hotels are managed by hotel owners/managers
         - Owners can add, update, and remove rooms
         - Inactive hotels are hidden from customers
+        - Ensures only hotel owner can manage hotel
+        - Supports hotel ownership validation
+
+    Hotel Ownership Flow :
+
+              HOTEL_MANAGER
+                    ↓
+              Creates Hotel
+                    ↓
+              Becomes Owner
+                    ↓
+             Can Update Hotel
+                    ↓
+             Can Delete Hotel
+                    ↓
+             Can Manage Rooms
+
+    Authorization Rule :
+
+            Hotel Owner
+                    ↓
+            Allowed Access
+
+            Other Users
+                    ↓
+            Access Denied
 
     Each record in the "hotel" table represents one hotel property.
 */

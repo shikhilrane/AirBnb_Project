@@ -1538,3 +1538,648 @@
             HotelMinPrice
                 ↓
             Hotel Search
+
+
+
+
+
+
+
+6. Adding Authentication and Authorisation in AirBnb Project
+
+    Authentication :
+        1. User Signup
+        2. User Login
+        3. JWT Access Token
+        4. Refresh Token
+
+    Authorization :
+        1. Role Based Access Control
+        2. Hotel Ownership Validation
+        3. Room Ownership Validation
+        4. Booking Ownership Validation
+
+    -------------------------------------------------
+        USER MANAGEMENT
+    -------------------------------------------------
+
+        Purpose :
+            Manage application users.
+
+        Roles :
+
+            GUEST
+                - Search Hotels
+                - Create Bookings
+                - Add Guests
+
+            HOTEL_MANAGER
+                - Create Hotels
+                - Manage Hotels
+                - Manage Rooms
+                - Manage Inventory
+
+        User Stores :
+
+            - Name
+            - Email
+            - Password
+            - Roles
+
+        Security Features :
+
+            - Unique Email
+            - Encrypted Password
+            - Multiple Roles Support
+
+    -------------------------------------------------
+        USER SIGNUP
+    -------------------------------------------------
+
+        Purpose :
+            Register a new user.
+
+        Flow :
+
+            User Details
+                    ↓
+              Validation
+                    ↓
+            Password Encode
+                    ↓
+               Save User
+                    ↓
+             Role = GUEST
+                    ↓
+             Signup Success
+
+        Endpoint :
+
+            POST /auth/signup
+
+    -------------------------------------------------
+        USER LOGIN
+    -------------------------------------------------
+
+        Purpose :
+            Authenticate users.
+
+        Flow :
+
+            Email + Password
+                    ↓
+            AuthenticationManager
+                    ↓
+             User Verified
+                    ↓
+            Access Token
+                    +
+            Refresh Token
+                    ↓
+              Login Success
+
+        Endpoint :
+
+            POST /auth/login
+
+    -------------------------------------------------
+        JWT ACCESS TOKEN
+    -------------------------------------------------
+
+        Purpose :
+            Authenticate API requests.
+
+        Contains :
+
+            - User Id
+            - Email
+            - Roles
+
+        Expiry :
+
+            10 Minutes
+
+        Example :
+
+            Authorization :
+
+                Bearer eyJhbGciOi...
+
+        Flow :
+
+            Login
+                ↓
+        Access Token
+                ↓
+          API Request
+                ↓
+         JWT Validation
+                ↓
+        User Authenticated
+
+    -------------------------------------------------
+        REFRESH TOKEN
+    -------------------------------------------------
+
+        Purpose :
+            Generate new access tokens
+            without requiring login.
+
+        Expiry :
+
+            6 Months
+
+        Stored In :
+
+            HttpOnly Cookie
+
+        Endpoint :
+
+            POST /auth/refresh
+
+        Flow :
+
+            Access Token Expired
+                    ↓
+              Refresh Token
+                    ↓
+             User Verified
+                    ↓
+           New Access Token
+
+    -------------------------------------------------
+        JWT AUTH FILTER
+    -------------------------------------------------
+
+        Purpose :
+            Authenticate every incoming request.
+
+        Responsibilities :
+
+            - Read JWT Token
+            - Validate JWT
+            - Extract User Id
+            - Load User
+            - Populate Security Context
+
+        Flow :
+
+            Request
+                ↓
+         Authorization Header
+                ↓
+             JWT Token
+                ↓
+          User Id Extracted
+                ↓
+            User Loaded
+                ↓
+       Authentication Created
+                ↓
+        Security Context
+                ↓
+         Request Continues
+
+    -------------------------------------------------
+        SPRING SECURITY
+    -------------------------------------------------
+
+        Purpose :
+            Protect APIs.
+
+        Security Rules :
+
+            /admin/**
+                    ↓
+             HOTEL_MANAGER
+
+            /bookings/**
+                    ↓
+            Authenticated User
+
+            Others
+                    ↓
+              Public APIs
+
+        Session Policy :
+
+            STATELESS
+
+        Authentication Type :
+
+            JWT Based
+
+    -------------------------------------------------
+        ROLE BASED AUTHORIZATION
+    -------------------------------------------------
+
+        Purpose :
+            Restrict APIs based on roles.
+
+        Example :
+
+            HOTEL_MANAGER
+                    ↓
+            POST /admin/hotels
+                    ↓
+            Access Granted
+
+            GUEST
+                    ↓
+            POST /admin/hotels
+                    ↓
+            Access Denied
+
+        Flow :
+
+            JWT Token
+                    ↓
+              Roles
+                    ↓
+        Spring Security
+                    ↓
+        Access Decision
+
+    -------------------------------------------------
+        OWNERSHIP VALIDATION
+    -------------------------------------------------
+
+        Purpose :
+            Ensure users can access
+            only their own resources.
+
+        Ownership Checks :
+
+            Hotel Ownership
+
+            Room Ownership
+
+            Booking Ownership
+
+        Example :
+
+            User A
+                ↓
+         Owns Hotel #1
+
+            User B
+                ↓
+        Access Hotel #1
+                ↓
+         Access Denied
+
+        Flow :
+
+            Current User
+                    ↓
+            Resource Owner
+                    ↓
+              Compare
+                    ↓
+          Match / No Match
+                    ↓
+      Access Granted / Denied
+
+    -------------------------------------------------
+        GLOBAL EXCEPTION HANDLING
+    -------------------------------------------------
+
+        Handles :
+
+            ResourceNotFoundException
+
+            AuthenticationException
+
+            JwtException
+
+            AccessDeniedException
+
+            MethodArgumentNotValidException
+
+            UnAuthorisedException
+
+        Responses :
+
+            404 NOT FOUND
+
+            401 UNAUTHORIZED
+
+            403 FORBIDDEN
+
+            400 BAD REQUEST
+
+            500 INTERNAL SERVER ERROR
+
+    -------------------------------------------------
+        AUTHENTICATION FLOW
+    -------------------------------------------------
+
+            Signup
+                ↓
+            Login
+                ↓
+          Access Token
+                +
+          Refresh Token
+                ↓
+        Protected APIs
+                ↓
+        JWT Validation
+                ↓
+        Access Granted
+
+    -------------------------------------------------
+        AUTHORIZATION FLOW
+    -------------------------------------------------
+
+            Request
+                ↓
+           JWT Token
+                ↓
+         User Extracted
+                ↓
+        Roles Extracted
+                ↓
+       Ownership Check
+                ↓
+      Access Granted/Denied
+
+    -------------------------------------------------
+        APIs IMPLEMENTED
+    -------------------------------------------------
+
+        Authentication APIs :
+
+            POST /auth/signup
+
+            POST /auth/login
+
+            POST /auth/refresh
+
+        Protected APIs :
+
+            POST   /admin/hotels
+
+            PUT    /admin/hotels/{id}
+
+            DELETE /admin/hotels/{id}
+
+            POST   /admin/hotels/{hotelId}/rooms
+
+            DELETE /admin/hotels/{hotelId}/rooms/{roomId}
+
+            POST   /bookings/init
+
+            POST   /bookings/{bookingId}/addGuests
+
+    -------------------------------------------------
+        PROJECT STATUS
+    -------------------------------------------------
+
+        Completed :
+
+            ✔ User Signup
+            ✔ User Login
+            ✔ JWT Authentication
+            ✔ Refresh Token
+            ✔ Spring Security
+            ✔ JWT Filter
+            ✔ Role Based Authorization
+            ✔ Hotel Ownership Validation
+            ✔ Room Ownership Validation
+            ✔ Booking Ownership Validation
+            ✔ Global Security Exception Handling
+
+        Next Modules :
+
+            → Payment Gateway
+            → Payment Capture
+            → Booking Confirmation
+            → Booking Cancellation
+            → Refund Management
+
+    =================================================
+        COMPLETE SECURITY FLOW
+    =================================================
+
+            User Signup
+                    ↓
+               Login
+                    ↓
+            JWT Generated
+                    ↓
+           Access Token
+                    ↓
+             API Call
+                    ↓
+            JWT Filter
+                    ↓
+         User Authenticated
+                    ↓
+           Role Check
+                    ↓
+       Ownership Check
+                    ↓
+         Access Granted
+
+        =================================================
+            FILE TO FILE FLOW
+        =================================================
+
+            User
+                ↓
+            Signup Request
+                ↓
+            AuthController
+                ↓
+            AuthServiceImpl
+                ↓
+            UserRepository
+                ↓
+            User Table
+
+        -------------------------------------------------
+
+            User Login
+                ↓
+            AuthController
+                ↓
+            AuthServiceImpl
+                ↓
+            AuthenticationManager
+                ↓
+            UserServiceImpl
+                ↓
+            UserRepository
+                ↓
+            User Loaded
+                ↓
+            JwtServiceImpl
+                ↓
+            Access Token
+                    +
+            Refresh Token
+
+        -------------------------------------------------
+
+            Protected API Request
+                ↓
+            Authorization Header
+                ↓
+            JWTAuthFilter
+                ↓
+            JwtServiceImpl
+                ↓
+            Extract User Id
+                ↓
+            UserServiceImpl
+                ↓
+            UserRepository
+                ↓
+            User Loaded
+                ↓
+            SecurityContextHolder
+                ↓
+            Authentication Created
+
+        -------------------------------------------------
+
+            Admin API
+                ↓
+            WebSecurityConfig
+                ↓
+            Role Check
+                ↓
+            HOTEL_MANAGER
+                ↓
+            HotelController
+                ↓
+            HotelServiceImpl
+                ↓
+            HotelRepository
+
+        -------------------------------------------------
+
+            Room API
+                ↓
+            RoomController
+                ↓
+            RoomServiceImpl
+                ↓
+            SecurityContextHolder
+                ↓
+            Current User
+                ↓
+            Hotel Owner Check
+                ↓
+            RoomRepository
+
+        -------------------------------------------------
+
+            Booking API
+                ↓
+            BookingController
+                ↓
+            BookingServiceImpl
+                ↓
+            SecurityContextHolder
+                ↓
+            Current User
+                ↓
+            Booking Owner Check
+                ↓
+            BookingRepository
+
+        -------------------------------------------------
+
+            Exception Occurs
+                ↓
+            JWTAuthFilter
+                    OR
+            Service Layer
+                    OR
+            Controller Layer
+                ↓
+            GlobalExceptionHandler
+                ↓
+            ApiError
+                ↓
+            APIResponse
+                ↓
+            JSON Response
+
+        =================================================
+            COMPLETE AUTHENTICATION FLOW
+        =================================================
+
+            User
+                ↓
+            AuthController
+                ↓
+            AuthServiceImpl
+                ↓
+            AuthenticationManager
+                ↓
+            UserServiceImpl
+                ↓
+            UserRepository
+                ↓
+            User
+                ↓
+            JwtServiceImpl
+                ↓
+            Access Token
+                    +
+            Refresh Token
+
+        =================================================
+            COMPLETE AUTHORIZATION FLOW
+        =================================================
+
+            Request
+                ↓
+            JWTAuthFilter
+                ↓
+            JwtServiceImpl
+                ↓
+            UserServiceImpl
+                ↓
+            SecurityContextHolder
+                ↓
+            WebSecurityConfig
+                ↓
+            Role Validation
+                ↓
+            Service Layer
+                ↓
+            Ownership Validation
+                ↓
+            Repository Layer
+                ↓
+            Database
+
+        =================================================
+            COMPLETE MODULE FLOW
+        =================================================
+
+            Signup
+                ↓
+            Login
+                ↓
+            JWT Generated
+                ↓
+            Protected API Request
+                ↓
+            JWT Validation
+                ↓
+            User Authentication
+                ↓
+            Role Authorization
+                ↓
+            Ownership Validation
+                ↓
+            Business Logic Execution
+                ↓
+            Database Operation
+                ↓
+            API Response

@@ -5,13 +5,16 @@ import com.shikhilrane.project.airBnbApp.dto.HotelInfoDto;
 import com.shikhilrane.project.airBnbApp.dto.RoomDto;
 import com.shikhilrane.project.airBnbApp.entity.Hotel;
 import com.shikhilrane.project.airBnbApp.entity.Room;
+import com.shikhilrane.project.airBnbApp.entity.User;
 import com.shikhilrane.project.airBnbApp.exception.ResourceNotFoundException;
+import com.shikhilrane.project.airBnbApp.exception.UnAuthorisedException;
 import com.shikhilrane.project.airBnbApp.repository.HotelRepository;
 import com.shikhilrane.project.airBnbApp.service.HotelService;
 import com.shikhilrane.project.airBnbApp.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,20 +30,29 @@ public class HotelServiceImpl implements HotelService {
     private final ModelMapper modelMapper;
     private final InventoryService inventoryService;
 
+    // Creates a new hotel and assigns ownership to the current HOTEL_MANAGER
     @Override
     public HotelDto createNewHotel(HotelDto hotelDto) {
         log.info("Creating a new hotel with name: {}", hotelDto.getName());     // Logs hotel creation request
         Hotel hotel = modelMapper.map(hotelDto, Hotel.class);                   // Converts DTO into Entity
         hotel.setActive(false);                                                 // Newly created hotels are inactive by default
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();   // Fetches currently authenticated HOTEL_MANAGER
+        hotel.setOwner(user);                                                   // Assigns current HOTEL_MANAGER as hotel owner
         Hotel saved = hotelRepository.save(hotel);                              // Saves hotel in database
         log.info("Created a new hotel with ID: {}", saved.getId());             // Logs generated hotel ID
         return modelMapper.map(saved, HotelDto.class);                          // Converts Entity back to DTO
     }
 
+    // Fetches hotel details after validating hotel ownership
     @Override
     public HotelDto getHotelById(Long id) {
         log.info("Getting the hotel with ID: {}", id);                                                                                 // Logs fetch request
         Hotel hotel = hotelRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: " + id)); // Fetches hotel or throws exception
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();           // Fetches currently authenticated HOTEL_MANAGER
+        // Verifies that hotel belongs to current user
+        if (!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("This user does not own this hotel with id " + id);             // Prevents unauthorized hotel access
+        }
         return modelMapper.map(hotel, HotelDto.class);                                                                                 // Converts Entity to DTO
     }
 
@@ -50,22 +62,37 @@ public class HotelServiceImpl implements HotelService {
         if (!exist) throw new ResourceNotFoundException("Employee not found with this ID : " + id);
     }
 
+    // Updates hotel details after validating hotel ownership
     @Override
     public HotelDto updateHotelById(Long id, HotelDto hotelDto) {
         log.info("Updating the hotel with ID: {}", id);             // Logs update request
-        validateHotelExists(id);                                    // Validates hotel existence
-        Hotel mappedHotel = modelMapper.map(hotelDto, Hotel.class); // Converts DTO into Entity
-        mappedHotel.setId(id);                                      // Sets ID so existing record gets updated
-        Hotel savedHotel = hotelRepository.save(mappedHotel);       // Updates hotel in database
+        Hotel hotel = hotelRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: " + id)); // Fetches hotel or throws exception
+
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();           // Fetches currently authenticated HOTEL_MANAGER
+        // Verifies that hotel belongs to current user
+        if (!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("This user does not own this hotel with id " + id);             // Prevents unauthorized hotel access
+        }
+
+        modelMapper.map(hotelDto, Hotel.class);                 // Converts DTO into Entity
+        hotel.setId(id);                                      // Sets ID so existing record gets updated
+        Hotel savedHotel = hotelRepository.save(hotel);       // Updates hotel in database
         return modelMapper.map(savedHotel, HotelDto.class);         // Converts updated Entity to DTO
     }
 
+    // Deletes hotel and associated inventories after validating hotel ownership
     @Override
     @Transactional
     public void deleteHotelById(Long id) {
         Hotel hotel = hotelRepository
                 .findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: "+id));  // Fetches hotel or throws exception
+
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();           // Fetches currently authenticated HOTEL_MANAGER
+        // Verifies that hotel belongs to current user
+        if (!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("This user does not own this hotel with id " + id);             // Prevents unauthorized hotel access
+        }
 
         for(Room room: hotel.getRooms()) {
             inventoryService.deleteFutureInventories(room);     // Deletes inventory records associated with each room
@@ -74,14 +101,22 @@ public class HotelServiceImpl implements HotelService {
         hotelRepository.deleteById(id);                         // Deletes hotel from database
     }
 
+    // Activates hotel and generates one year of inventory after validating hotel ownership
     @Override
     @Transactional
     public void activateHotel(Long hotelId) {
-        log.info("Activating the hotel with ID: {}", hotelId);                                            // Logs hotel activation request
+        log.info("Activating the hotel with ID: {}", hotelId);                                              // Logs hotel activation request
         Hotel hotel = hotelRepository
                 .findById(hotelId)
-                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: " + hotelId)); // Fetches hotel or throws exception
-        hotel.setActive(true);                                                                            // Marks hotel as active and available for booking
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: " + hotelId));   // Fetches hotel or throws exception
+
+        User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();           // Fetches currently authenticated HOTEL_MANAGER
+        // Verifies that hotel belongs to current user
+        if (!user.equals(hotel.getOwner())) {
+            throw new UnAuthorisedException("This user does not own this hotel with id " + hotelId);        // Prevents unauthorized hotel access
+        }
+
+        hotel.setActive(true);                                                                              // Marks hotel as active and available for booking
 
         // assuming only do it once
         for(Room room: hotel.getRooms()) {                  // For each room in the hotel, generates inventory records for the next 1 year.
@@ -89,6 +124,7 @@ public class HotelServiceImpl implements HotelService {
         }
     }
 
+    // Returns hotel information along with room details
     @Override
     public HotelInfoDto getHotelInfoById(Long hotelId) {
         log.info("Getting Hotel with ID: {}", hotelId);
@@ -108,79 +144,145 @@ public class HotelServiceImpl implements HotelService {
 /*
     HotelServiceImpl
 
-        Purpose : Implements hotel-related business operations.
+        Purpose : Handles hotel-related business operations.
                   Acts as a bridge between the Controller and Repository layers.
 
         Responsibilities :
-            - Create a new hotel
-            - Get hotel details by ID
+            - Create hotels
+            - Fetch hotel details
             - Update hotel information
-            - Delete a hotel
-            - Activate a hotel
+            - Delete hotels
+            - Activate hotels
             - Validate hotel existence
+            - Validate hotel ownership
+            - Generate inventory for active hotels
 
         Methods :
 
             createNewHotel()
-                - Creates a new hotel record
-                - Sets hotel status as inactive by default
+                - Creates a new hotel
+                - Assigns current HOTEL_MANAGER as owner
+                - Creates hotel in INACTIVE state
 
             getHotelById()
-                - Fetches hotel details using hotel ID
+                - Fetches hotel details
+                - Verifies hotel ownership
+
+            validateHotelExists()
+                - Checks whether hotel exists
+                - Throws exception if hotel is not found
 
             updateHotelById()
-                - Updates existing hotel information
+                - Updates hotel details
+                - Verifies hotel ownership
 
             deleteHotelById()
-                - Deletes a hotel from the database
-                - Removes inventory records associated with hotel rooms before deletion
+                - Verifies hotel ownership
+                - Deletes hotel inventories
+                - Deletes hotel record
 
             activateHotel()
-                - Changes hotel status from inactive to active
-                - Generates one year of inventory records for all hotel rooms
+                - Verifies hotel ownership
+                - Activates hotel
+                - Generates one year inventory
                 - Makes hotel available for booking
 
             getHotelInfoById()
-                - Fetches complete hotel information
-                - Returns hotel details along with all room details
-
-            validateHotelExists()
-                - Checks whether a hotel exists
-                - Throws exception if hotel is not found
-
-        Responsibilities :
-            - Create a new hotel
-            - Get hotel details by ID
-            - Get complete hotel information
-            - Update hotel information
-            - Delete a hotel
-            - Activate a hotel
-            - Validate hotel existence
+                - Returns hotel information
+                - Returns all room details
 
         Business Use :
-            - Handles hotel management operations
-            - Applies business rules before database operations
-            - Converts DTOs into entities and vice versa
-            - Controls hotel activation lifecycle
-            - Provides complete hotel and room information
-            - Throws meaningful exceptions when hotel is not found
-            - Automatically generates inventory when a hotel is activated
-            - Removes room inventory before hotel deletion
-            - Ensures hotels are booking-ready after activation
+            - Allows HOTEL_MANAGER to manage hotels
+            - Supports hotel lifecycle management
+            - Supports hotel activation workflow
+            - Supports inventory generation
+            - Prevents unauthorized hotel access
+            - Ensures only owners manage hotels
 
         Hotel Lifecycle :
 
-               Hotel Created
+              Hotel Created
                     ↓
-                 INACTIVE
+                INACTIVE
                     ↓
-               activateHotel()
+            activateHotel()
                     ↓
-             Inventory Generated
+         Inventory Generated
                     ↓
-                  ACTIVE
+                 ACTIVE
                     ↓
-             Available For Booking
+        Available For Booking
 
-        This class acts as the business layer for hotel management.
+        OR
+
+              Hotel Created
+                    ↓
+             Manage Hotel
+                    ↓
+             Delete Hotel
+                    ↓
+          Inventories Deleted
+                    ↓
+            Hotel Removed
+
+        Hotel Ownership Flow :
+
+            HOTEL_MANAGER Login
+                    ↓
+              Create Hotel
+                    ↓
+             Owner Assigned
+                    ↓
+            Hotel Saved
+                    ↓
+           Hotel Management
+                    ↓
+           Ownership Check
+                    ↓
+          Access Granted / Denied
+
+        Authorization Rules :
+
+            Hotel Owner
+                    ↓
+            Can View Hotel
+
+            Can Update Hotel
+
+            Can Activate Hotel
+
+            Can Delete Hotel
+
+            Other Users
+                    ↓
+            Access Denied
+
+        Inventory Generation Flow :
+
+            Hotel Activated
+                    ↓
+             Fetch Rooms
+                    ↓
+            initializeRoomForAYear()
+                    ↓
+            Create Daily Inventory
+                    ↓
+            Next 365 Days
+
+        Security Features :
+            - Hotel ownership validation
+            - Unauthorized access prevention
+            - Role-based access control
+            - Secure hotel management
+
+        Note :
+            - Every hotel has exactly one owner.
+            - Only owners can manage hotels.
+            - Newly created hotels are inactive.
+            - Inventory is generated only after activation.
+            - Hotel deletion removes associated inventories.
+            - Ownership is determined using authenticated user.
+
+        This class acts as the business layer
+        for hotel management.
 */

@@ -1,8 +1,11 @@
 package com.shikhilrane.project.airBnbApp.advices;
 
 import com.shikhilrane.project.airBnbApp.exception.ResourceNotFoundException;
+import io.jsonwebtoken.JwtException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -36,6 +39,32 @@ public class GlobalExceptionHandler {
         return buildErrorResponseEntity(apiError);          // Returns standardized error response
     }
 
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<APIResponse<?>> handleAuthenticationException(AuthenticationException ex) {
+        ApiError apiError = ApiError.builder()
+                .status(HttpStatus.UNAUTHORIZED)
+                .message(ex.getMessage())
+                .build();
+        return buildErrorResponseEntity(apiError);
+    }
+
+    @ExceptionHandler(JwtException.class)
+    public ResponseEntity<APIResponse<?>> handleJwtException(JwtException ex) {
+        ApiError apiError = ApiError.builder()
+                .status(HttpStatus.UNAUTHORIZED)
+                .message(ex.getMessage())
+                .build();
+        return buildErrorResponseEntity(apiError);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<APIResponse<?>> handleAccessDeniedException(AccessDeniedException ex) {
+        ApiError apiError = ApiError.builder()
+                .status(HttpStatus.FORBIDDEN)
+                .message(ex.getMessage())
+                .build();
+        return buildErrorResponseEntity(apiError);
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class) // Handles validation failures
     public ResponseEntity<APIResponse<?>> handleInputValidationErrors(MethodArgumentNotValidException e){
@@ -67,85 +96,186 @@ public class GlobalExceptionHandler {
 /*
     GlobalExceptionHandler
 
-        Purpose : Handles exceptions globally for the entire application.
-                  Provides consistent error responses for all APIs.
+        Purpose : Handles exceptions globally across the application.
+                  Provides consistent and centralized error responses.
 
         Responsibilities :
-            - Handle resource not found exceptions
-            - Handle validation errors
+            - Handle business exceptions
+            - Handle authentication failures
+            - Handle authorization failures
+            - Handle JWT errors
+            - Handle validation failures
             - Handle unexpected server errors
-            - Return standardized API error responses
+            - Return standardized API responses
 
-        Handled Exceptions :
+        Methods :
 
-            ResourceNotFoundException
-                - Returned when requested data does not exist
+            handleResourceNotFound()
+                - Handles ResourceNotFoundException
                 - Returns HTTP 404 NOT FOUND
 
-            MethodArgumentNotValidException
-                - Returned when validation fails
-                - Returns HTTP 400 BAD REQUEST
-
-            Exception
-                - Catches all unhandled exceptions
+            handleInternalServerError()
+                - Handles unexpected exceptions
                 - Returns HTTP 500 INTERNAL SERVER ERROR
 
-        Error Response Flow :
+            handleAuthenticationException()
+                - Handles authentication failures
+                - Returns HTTP 401 UNAUTHORIZED
+
+            handleJwtException()
+                - Handles invalid or expired JWT tokens
+                - Returns HTTP 401 UNAUTHORIZED
+
+            handleAccessDeniedException()
+                - Handles authorization failures
+                - Returns HTTP 403 FORBIDDEN
+
+            handleInputValidationErrors()
+                - Handles validation failures
+                - Returns HTTP 400 BAD REQUEST
+
+            buildErrorResponseEntity()
+                - Builds standardized error response
+
+        Exception Flow :
 
             Exception Thrown
                     ↓
             GlobalExceptionHandler
                     ↓
-            ApiError Created
+              ApiError
                     ↓
-            APIResponse Wrapped
+             APIResponse
                     ↓
-            JSON Response Returned
+              JSON Response
 
-        Example :
+        Handled Exceptions :
 
-            Hotel Not Found
+            ResourceNotFoundException
+                    ↓
+                404 NOT FOUND
 
-                Request :
-                    GET /admin/hotels/100
+            AuthenticationException
+                    ↓
+              401 UNAUTHORIZED
 
-                Response :
-                    {
-                        "success": false,
-                        "error": {
-                            "status": "NOT_FOUND",
-                            "message": "Hotel not found with ID: 100"
-                        }
+            JwtException
+                    ↓
+              401 UNAUTHORIZED
+
+            AccessDeniedException
+                    ↓
+                403 FORBIDDEN
+
+            MethodArgumentNotValidException
+                    ↓
+              400 BAD REQUEST
+
+            Exception
+                    ↓
+          500 INTERNAL SERVER ERROR
+
+        Authentication Failure Flow :
+
+            Invalid Credentials
+                    ↓
+        AuthenticationException
+                    ↓
+            Error Response
+                    ↓
+              401 Response
+
+        JWT Failure Flow :
+
+            Invalid Token
+                    ↓
+            JwtException
+                    ↓
+            Error Response
+                    ↓
+              401 Response
+
+        Authorization Failure Flow :
+
+            Protected API
+                    ↓
+            Access Denied
+                    ↓
+        AccessDeniedException
+                    ↓
+              403 Response
+
+        Validation Failure Flow :
+
+            Invalid Request
+                    ↓
+        Validation Failure
+                    ↓
+      MethodArgumentNotValidException
+                    ↓
+              400 Response
+
+        Example Responses :
+
+            Resource Not Found :
+
+                {
+                    "error": {
+                        "status": "404 NOT_FOUND",
+                        "message": "Hotel not found with ID: 1"
                     }
+                }
 
-        Validation Error Example :
+            Authentication Failure :
 
-                Request :
-                    POST /admin/hotels
-
-                Invalid Input :
-                    {
-                        "name": ""
+                {
+                    "error": {
+                        "status": "401 UNAUTHORIZED",
+                        "message": "Bad credentials"
                     }
+                }
 
-                Response :
-                    {
-                        "success": false,
-                        "error": {
-                            "status": "BAD_REQUEST",
-                            "message": "Input validation failed",
-                            "subErrors": [
-                                "Hotel name is required",
-                                "City is required"
-                            ]
-                        }
+            Authorization Failure :
+
+                {
+                    "error": {
+                        "status": "403 FORBIDDEN",
+                        "message": "Access Denied"
                     }
+                }
+
+            Validation Failure :
+
+                {
+                    "error": {
+                        "status": "400 BAD_REQUEST",
+                        "message": "Input validation failed",
+                        "subErrors": [
+                            "Hotel name is required"
+                        ]
+                    }
+                }
 
         Benefits :
             - Centralized exception handling
-            - Cleaner controllers and services
             - Consistent API responses
-            - Easier maintenance and debugging
+            - Cleaner controllers and services
+            - Easier debugging
+            - Better client-side error handling
+            - Improved maintainability
 
-        This class acts as the global error handling layer of the application.
+        Security Features :
+            - Handles authentication failures
+            - Handles authorization failures
+            - Handles JWT validation errors
+            - Prevents internal exception leakage
+
+        Note :
+            - Applies globally to all controllers.
+            - Returns standardized APIResponse format.
+            - Security exceptions are handled centrally.
+            - Validation errors return all failed validations.
+
+        This class acts as the global exception handling layer
+        of the application.
 */
