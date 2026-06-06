@@ -38,7 +38,7 @@ public class RoomServiceImpl implements RoomService {
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: " + hotelId)); // Fetches hotel or throws exception
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();       // Fetches currently authenticated HOTEL_MANAGER
         // Verifies that hotel belongs to the current user
-        if (!user.equals(hotel.getOwner())) {
+        if (!user.getId().equals(hotel.getOwner().getId())) {
             throw new UnAuthorisedException("This user does not own this hotel with id " + hotelId);    // Prevents unauthorized hotel access
         }
         Room mappedRoom = modelMapper.map(roomDto, Room.class);                     // Converts DTO into Entity
@@ -62,8 +62,8 @@ public class RoomServiceImpl implements RoomService {
                 .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: " + hotelId));
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();       // Fetches currently authenticated HOTEL_MANAGER
         // Verifies that hotel belongs to the current user
-        if (!user.equals(hotel.getOwner())) {
-            throw new UnAuthorisedException("This user does not own this hotel with id " + hotelId);    // Prevents unauthorized hotel access
+        if (!user.getId().equals(hotel.getOwner().getId())) {
+            throw new UnAuthorisedException("This user does not own this hotel with id " + hotelId);
         }
         return hotel.getRooms()
                 .stream()
@@ -71,14 +71,25 @@ public class RoomServiceImpl implements RoomService {
                 .collect(Collectors.toList());                                      // Returns list of room DTOs
     }
 
-    // Returns room details using room ID
+    // Returns room details using room ID after validating room ownership
     @Override
     public RoomDto getRoomById(Long roomId) {
-        log.info("Getting the room with ID: {}", roomId);
+        log.info("Getting the room with ID: {}", roomId);                             // Logs room fetch request
+
         Room room = roomRepository
                 .findById(roomId)
-                .orElseThrow(() -> new ResourceNotFoundException("Room not found with ID: "+roomId));   // Fetches room or throws exception
-        return modelMapper.map(room, RoomDto.class);                                // Converts Entity to DTO
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found with ID: " + roomId));    // Fetches room or throws exception
+
+        User user = (User) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();                                                      // Fetches currently authenticated HOTEL_MANAGER
+
+        // Verifies that room belongs to the current user's hotel
+        if (!user.getId().equals(room.getHotel().getOwner().getId())) {
+            throw new UnAuthorisedException("This user does not own this room with id " + roomId);            // Prevents unauthorized room access
+        }
+
+        return modelMapper.map(room, RoomDto.class);                                  // Converts Entity to DTO
     }
 
     // Deletes room and associated inventories after validating room ownership
@@ -90,8 +101,8 @@ public class RoomServiceImpl implements RoomService {
                 .findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found with ID: "+roomId));   // Fetches room or throws exception
         User user = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();       // Fetches currently authenticated HOTEL_MANAGER
-        if (!user.equals(room.getHotel().getOwner())) {
-            throw new UnAuthorisedException("This user does not own this room with id " + roomId);      // Prevents unauthorized room access
+        if (!user.getId().equals(room.getHotel().getOwner().getId())) {
+            throw new UnAuthorisedException("This user does not own this room with id " + roomId);
         }
         inventoryService.deleteFutureInventories(room);                             // Deletes inventory records associated with room
         roomRepository.deleteById(roomId);                                          // Deletes room from database
@@ -127,6 +138,8 @@ public class RoomServiceImpl implements RoomService {
 
         getRoomById()
             - Fetches room details using room ID
+            - Verifies room ownership
+            - Returns room information
 
         deleteRoomById()
             - Verifies room ownership
@@ -136,6 +149,7 @@ public class RoomServiceImpl implements RoomService {
     Business Use :
         - Allows HOTEL_MANAGER to manage rooms
         - Supports room creation and deletion
+        - Supports room information retrieval
         - Supports hotel inventory generation
         - Maintains room availability lifecycle
         - Prevents unauthorized room access
@@ -178,6 +192,16 @@ public class RoomServiceImpl implements RoomService {
                 ↓
           Delete Room
 
+        OR
+
+        HOTEL_MANAGER Login
+                ↓
+          Select Room
+                ↓
+        Ownership Check
+                ↓
+        View Room Details
+
     Authorization Rules :
 
         Hotel Owner
@@ -185,6 +209,8 @@ public class RoomServiceImpl implements RoomService {
         Can Create Rooms
 
         Can View Rooms
+
+        Can View Room Details
 
         Can Delete Rooms
 
@@ -214,6 +240,7 @@ public class RoomServiceImpl implements RoomService {
     Note :
         - Only hotel owners can create rooms.
         - Only hotel owners can view hotel rooms.
+        - Only hotel owners can view room details.
         - Only hotel owners can delete rooms.
         - Inventory is automatically generated for active hotels.
         - Room deletion removes associated inventory records.

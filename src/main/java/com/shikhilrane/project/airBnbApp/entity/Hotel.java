@@ -1,5 +1,6 @@
 package com.shikhilrane.project.airBnbApp.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -45,6 +46,7 @@ public class Hotel {
     private User owner;                     // User who owns and manages this hotel
 
     @OneToMany(mappedBy = "hotel")
+    @JsonManagedReference                   // Parent side of bidirectional relationship, included during JSON serialization
     private List<Room> rooms;               // All room types available in this hotel
 }
 

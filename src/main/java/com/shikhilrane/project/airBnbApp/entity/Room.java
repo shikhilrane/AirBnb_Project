@@ -1,5 +1,7 @@
 package com.shikhilrane.project.airBnbApp.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -20,6 +22,7 @@ public class Room {
 
     @ManyToOne
     @JoinColumn(name = "hotel_id", nullable = false)
+    @JsonBackReference                                      // Child side of bidirectional relationship, ignored during JSON serialization to prevent infinite recursion
     private Hotel hotel;                                    // Hotel to which this room belongs
 
     @Column(nullable = false)

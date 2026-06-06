@@ -2,6 +2,7 @@ package com.shikhilrane.project.airBnbApp.controller;
 
 import com.shikhilrane.project.airBnbApp.dto.BookingDto;
 import com.shikhilrane.project.airBnbApp.dto.BookingRequest;
+import com.shikhilrane.project.airBnbApp.dto.BookingStatusResponseDto;
 import com.shikhilrane.project.airBnbApp.dto.GuestDto;
 import com.shikhilrane.project.airBnbApp.service.BookingService;
 import jakarta.validation.Valid;
@@ -11,6 +12,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -18,7 +20,7 @@ import java.util.List;
 @Validated
 public class HotelBookingController {
 
-    private final BookingService bookingService;
+    private final BookingService bookingService;        // Handles booking, guest, payment and cancellation operations
 
     // 1. Initialize a new booking
     @PostMapping("/init")
@@ -31,58 +33,141 @@ public class HotelBookingController {
     public ResponseEntity<BookingDto> addGuests(@PathVariable Long bookingId, @Valid @RequestBody List<GuestDto> guestDtoList){
         return ResponseEntity.ok(bookingService.addGuests(bookingId, guestDtoList));
     }
+
+    // 3. Creates Stripe checkout session and returns payment URL
+    @PostMapping("/{bookingId}/payments")
+    public ResponseEntity<Map<String, String>> initiatePayment(@PathVariable Long bookingId) {
+        String sessionUrl = bookingService.initiatePayments(bookingId);             // Generates Stripe checkout session
+        return ResponseEntity.ok(Map.of("sessionUrl", sessionUrl));
+    }
+
+    // 4. Cancels an existing booking and triggers refund if applicable
+    @PostMapping("/{bookingId}/cancel")
+    public ResponseEntity<Void> cancelBooking(@PathVariable Long bookingId) {
+        bookingService.cancelBooking(bookingId);                                    // Cancels booking and releases inventory
+        return ResponseEntity.noContent().build();
+    }
+
+    // 5. Returns current booking status
+    @GetMapping("/{bookingId}/status")
+    public ResponseEntity<BookingStatusResponseDto> getBookingStatus(@PathVariable Long bookingId) {
+        return ResponseEntity.ok(new BookingStatusResponseDto(bookingService.getBookingStatus(bookingId)));
+    }
 }
 
 /*
     HotelBookingController
 
-        Purpose : Handles hotel booking operations for guests.
+        Purpose :
+            Handles hotel booking operations for guests.
+            Acts as the entry point for booking lifecycle management.
 
         Responsibilities :
-            - Create a new booking
-            - Add guests to a booking
+            - Create bookings
+            - Add guests to bookings
+            - Initiate payments
+            - Cancel bookings
+            - Fetch booking status
 
         Endpoints :
 
             POST /bookings/init
-                - Initializes a booking
+                - Creates a booking
                 - Reserves room inventory
-                - Creates booking record
+                - Calculates booking amount
 
             POST /bookings/{bookingId}/addGuests
-                - Adds guest details to a booking
+                - Adds guest information
+                - Associates guests with booking
 
-        Flow :
+            POST /bookings/{bookingId}/payments
+                - Creates Stripe checkout session
+                - Returns payment URL
 
-            Guest Request
-                  ↓
-            Controller
-                  ↓
+            POST /bookings/{bookingId}/cancel
+                - Cancels booking
+                - Releases inventory
+                - Initiates refund if payment exists
+
+            GET /bookings/{bookingId}/status
+                - Returns current booking status
+
+        Booking Lifecycle :
+
+            Booking Created
+                    ↓
+                RESERVED
+                    ↓
+            Add Guest Details
+                    ↓
+             Initiate Payment
+                    ↓
+            PAYMENTS_PENDING
+                    ↓
+            Payment Success
+                    ↓
+                CONFIRMED
+
+        Cancellation Flow :
+
+            Confirmed Booking
+                    ↓
+              Cancel Request
+                    ↓
+             Inventory Released
+                    ↓
+             Refund Initiated
+                    ↓
+                CANCELLED
+
+        Payment Flow :
+
+            Booking Created
+                    ↓
+            Payment Endpoint
+                    ↓
+          Stripe Checkout URL
+                    ↓
+           User Completes Payment
+                    ↓
+              Stripe Webhook
+                    ↓
+             Booking Confirmed
+
+        Status Flow :
+
+            Client Request
+                    ↓
+           Get Booking Status
+                    ↓
             Service Layer
-                  ↓
-            Inventory Validation
-                  ↓
-            Booking Creation
-                  ↓
-            Database
+                    ↓
+            Current Status
+                    ↓
+             API Response
 
-        Booking Flow :
+        Business Use :
+            - Room reservation
+            - Guest management
+            - Payment processing
+            - Booking tracking
+            - Booking cancellation
+            - Refund handling
 
-            Search Hotel
-                  ↓
-            Select Room
-                  ↓
-            Initialize Booking
-                  ↓
-            Add Guests
-                  ↓
-            Complete Booking
+        Security Features :
+            - Authenticated booking access
+            - Booking ownership validation
+            - Inventory locking
+            - Secure payment processing
+            - Stripe webhook integration
 
         Note :
-            - Booking initialization checks room availability.
-            - Inventory records are locked during booking creation.
-            - Guest details are attached to an existing booking.
+            - Inventory is reserved during booking initialization.
+            - Payment is handled through Stripe Checkout.
+            - Booking confirmation occurs through webhooks.
+            - Refunds are triggered during cancellation.
             - Controller contains no business logic.
 
-        This controller is responsible for booking-related operations.
+        This controller acts as the booking
+        management entry point of the application.
 */

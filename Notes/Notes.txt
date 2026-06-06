@@ -2183,3 +2183,456 @@
             Database Operation
                 ↓
             API Response
+
+
+7. Payment Support (STRIPE INTEGRATION)
+    stripe listen --forward-to localhost:8080/api/v1/webhook/payment
+
+        Purpose :
+            Enables secure online payments
+            for hotel bookings using Stripe.
+
+        Features Implemented :
+            ✔ Stripe Checkout Session
+            ✔ Stripe Webhook Verification
+            ✔ Payment Confirmation
+            ✔ Booking Confirmation
+            ✔ Booking Cancellation
+            ✔ Refund Processing
+            ✔ Inventory Synchronization
+            ✔ Session Expiration Handling
+
+    -------------------------------------------------
+        STRIPE CONFIGURATION
+    -------------------------------------------------
+
+        Purpose :
+            Configure Stripe SDK
+            using application properties.
+
+        Configuration :
+
+            stripe.secret.key
+                - Stripe API Secret Key
+
+            stripe.webhook.secret
+                - Stripe Webhook Signing Secret
+
+        Flow :
+
+            Spring Boot
+                    ↓
+              StripeConfig
+                    ↓
+            Stripe.apiKey
+                    ↓
+             Stripe APIs
+
+    -------------------------------------------------
+        PAYMENT INITIATION
+    -------------------------------------------------
+
+        Purpose :
+            Create Stripe Checkout Session
+            for a booking.
+
+        Endpoint :
+
+            POST /bookings/{bookingId}/payments
+
+        Flow :
+
+            Booking Created
+                    ↓
+            initiatePayments()
+                    ↓
+            CheckoutService
+                    ↓
+            Stripe Session
+                    ↓
+             Session URL
+                    ↓
+            User Redirected
+                    ↓
+             Stripe Checkout
+
+    -------------------------------------------------
+        STRIPE CUSTOMER CREATION
+    -------------------------------------------------
+
+        Purpose :
+            Create Stripe Customer
+            using authenticated user details.
+
+        Data Sent :
+
+            Name
+            Email
+
+        Flow :
+
+            Current User
+                    ↓
+            CustomerCreateParams
+                    ↓
+             Stripe Customer
+                    ↓
+              Customer ID
+
+    -------------------------------------------------
+        CHECKOUT SESSION CREATION
+    -------------------------------------------------
+
+        Purpose :
+            Generate Stripe-hosted
+            payment page.
+
+        Session Details :
+
+            Customer
+            Amount
+            Currency
+            Booking Details
+
+        Flow :
+
+            Booking Amount
+                    ↓
+            Line Item
+                    ↓
+          SessionCreateParams
+                    ↓
+            Stripe Session
+                    ↓
+              Session URL
+
+        Example :
+
+            Booking Amount = ₹5000
+
+                    ↓
+
+            Stripe Amount = 500000
+
+            (Amount × 100)
+
+    -------------------------------------------------
+        PAYMENT PENDING STATUS
+    -------------------------------------------------
+
+        Purpose :
+            Track bookings waiting
+            for payment completion.
+
+        Flow :
+
+            Booking Created
+                    ↓
+                RESERVED
+                    ↓
+            initiatePayments()
+                    ↓
+            PAYMENTS_PENDING
+
+    -------------------------------------------------
+        WEBHOOK SUPPORT
+    -------------------------------------------------
+
+        Purpose :
+            Receive payment events
+            directly from Stripe.
+
+        Endpoint :
+
+            POST /webhook/payment
+
+        Flow :
+
+            Stripe
+                    ↓
+              Webhook Event
+                    ↓
+            WebhookController
+                    ↓
+          Signature Verification
+                    ↓
+             BookingService
+
+    -------------------------------------------------
+        WEBHOOK SECURITY
+    -------------------------------------------------
+
+        Purpose :
+            Ensure webhook requests
+            originate from Stripe.
+
+        Verification :
+
+            Stripe-Signature Header
+                    ↓
+          Webhook.constructEvent()
+                    ↓
+             Signature Verified
+
+        Invalid Signature
+                    ↓
+          Request Rejected
+
+    -------------------------------------------------
+        PAYMENT SUCCESS FLOW
+    -------------------------------------------------
+
+        Event :
+
+            checkout.session.completed
+
+        Flow :
+
+            Payment Success
+                    ↓
+          Stripe Webhook Event
+                    ↓
+          capturePayment()
+                    ↓
+          Find Booking
+                    ↓
+          Booking Status
+                    ↓
+             CONFIRMED
+                    ↓
+          Inventory Updated
+
+        Inventory Update :
+
+            reservedCount
+                    ↓
+               Decrease
+
+            bookedCount
+                    ↓
+               Increase
+
+    -------------------------------------------------
+        PAYMENT EXPIRATION FLOW
+    -------------------------------------------------
+
+        Event :
+
+            checkout.session.expired
+
+        Purpose :
+            Release inventory when
+            payment is not completed.
+
+        Flow :
+
+            Checkout Session
+                    ↓
+                 Expired
+                    ↓
+          Stripe Webhook Event
+                    ↓
+          Booking Status
+                    ↓
+              CANCELLED
+                    ↓
+          Inventory Released
+
+    -------------------------------------------------
+        BOOKING CANCELLATION
+    -------------------------------------------------
+
+        Endpoint :
+
+            POST /bookings/{bookingId}/cancel
+
+        Purpose :
+            Cancel confirmed booking
+            and initiate refund.
+
+        Flow :
+
+            Confirmed Booking
+                    ↓
+              Cancel Request
+                    ↓
+           Inventory Released
+                    ↓
+              Stripe Refund
+                    ↓
+               CANCELLED
+
+    -------------------------------------------------
+        REFUND SUPPORT
+    -------------------------------------------------
+
+        Purpose :
+            Refund payment after
+            booking cancellation.
+
+        Stripe API :
+
+            Refund.create()
+
+        Flow :
+
+            Booking Cancelled
+                    ↓
+             Session Retrieve
+                    ↓
+             Payment Intent
+                    ↓
+            RefundCreateParams
+                    ↓
+             Stripe Refund
+
+    -------------------------------------------------
+        INVENTORY SYNCHRONIZATION
+    -------------------------------------------------
+
+        Purpose :
+            Keep inventory consistent
+            with payment status.
+
+        Payment Success :
+
+            Reserved Rooms
+                    ↓
+               Booked Rooms
+
+        Payment Expired :
+
+            Reserved Rooms
+                    ↓
+             Available Rooms
+
+        Booking Cancelled :
+
+            Booked Rooms
+                    ↓
+             Available Rooms
+
+    -------------------------------------------------
+        APIS IMPLEMENTED
+    -------------------------------------------------
+
+        Payment APIs :
+
+            POST /bookings/{bookingId}/payments
+
+            POST /bookings/{bookingId}/cancel
+
+        Webhook APIs :
+
+            POST /webhook/payment
+
+    -------------------------------------------------
+        BOOKING STATUS FLOW
+    -------------------------------------------------
+
+            RESERVED
+                ↓
+        initiatePayments()
+                ↓
+        PAYMENTS_PENDING
+                ↓
+
+        Payment Success
+                ↓
+
+            CONFIRMED
+
+                OR
+
+        Session Expired
+                ↓
+
+            CANCELLED
+
+                OR
+
+        User Cancellation
+                ↓
+
+            CANCELLED
+
+    -------------------------------------------------
+        COMPLETE PAYMENT FLOW
+    -------------------------------------------------
+
+            Guest
+                ↓
+          Create Booking
+                ↓
+            RESERVED
+                ↓
+          Add Guests
+                ↓
+        initiatePayments()
+                ↓
+        PAYMENTS_PENDING
+                ↓
+         Stripe Checkout
+                ↓
+
+        Payment Success
+                ↓
+
+        checkout.session.completed
+                ↓
+
+          WebhookController
+                ↓
+
+         BookingService
+                ↓
+
+           CONFIRMED
+                ↓
+
+        Inventory Updated
+
+    -------------------------------------------------
+        PROJECT STATUS
+    -------------------------------------------------
+
+        Completed :
+
+            ✔ Stripe Integration
+            ✔ Checkout Session Creation
+            ✔ Customer Creation
+            ✔ Payment URL Generation
+            ✔ Payment Pending Status
+            ✔ Stripe Webhook Support
+            ✔ Webhook Signature Verification
+            ✔ Payment Confirmation
+            ✔ Session Expiration Handling
+            ✔ Booking Cancellation
+            ✔ Refund Processing
+            ✔ Inventory Synchronization
+
+    =================================================
+        COMPLETE PAYMENT MODULE FLOW
+    =================================================
+
+            Booking
+                ↓
+          Stripe Checkout
+                ↓
+         Checkout Session
+                ↓
+          Payment Page
+                ↓
+          User Payment
+                ↓
+          Stripe Event
+                ↓
+          Webhook API
+                ↓
+         BookingService
+                ↓
+          Booking Status
+                ↓
+        Inventory Update
+                ↓
+          Booking Finalized
