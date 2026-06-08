@@ -1,13 +1,14 @@
 package com.shikhilrane.project.airBnbApp.service.impl;
 
-import com.shikhilrane.project.airBnbApp.dto.HotelDto;
-import com.shikhilrane.project.airBnbApp.dto.HotelPriceDto;
-import com.shikhilrane.project.airBnbApp.dto.HotelSearchReuestDto;
+import com.shikhilrane.project.airBnbApp.dto.*;
 import com.shikhilrane.project.airBnbApp.entity.Hotel;
 import com.shikhilrane.project.airBnbApp.entity.Inventory;
 import com.shikhilrane.project.airBnbApp.entity.Room;
+import com.shikhilrane.project.airBnbApp.entity.User;
+import com.shikhilrane.project.airBnbApp.exception.ResourceNotFoundException;
 import com.shikhilrane.project.airBnbApp.repository.HotelMinPriceRepository;
 import com.shikhilrane.project.airBnbApp.repository.InventoryRepository;
+import com.shikhilrane.project.airBnbApp.repository.RoomRepository;
 import com.shikhilrane.project.airBnbApp.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,18 +17,25 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static com.shikhilrane.project.airBnbApp.util.AppUtils.getCurrentUser;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class InventoryServiceImpl implements InventoryService {
-    private final InventoryRepository inventoryRepository;
-    private final ModelMapper modelMapper;
-    private final HotelMinPriceRepository hotelMinPriceRepository;
+    private final InventoryRepository inventoryRepository;          // Performs inventory database operations
+    private final ModelMapper modelMapper;                          // Converts entities and DTOs
+    private final HotelMinPriceRepository hotelMinPriceRepository;  // Performs optimized hotel search queries
+    private final RoomRepository roomRepository;                    // Performs room database operations
 
     @Override
     public void initializeRoomForAYear(Room room) {
@@ -73,44 +81,117 @@ public class InventoryServiceImpl implements InventoryService {
                 pageable);                                  // Pagination details
         return hotelPage; // Converts Hotel entities into HotelDto objects and returns paginated result
     }
+
+    // Retrieves all inventory records of a room after ownership validation
+    @Override
+    public List<InventoryDto> getAllInventoryByRoom(Long roomId) {
+
+        log.info("Getting all inventory for room with id: {}", roomId);      // Logs inventory retrieval request
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + roomId)); // Fetches room or throws exception
+
+        User user = getCurrentUser();                                         // Retrieves currently authenticated user
+
+        if (!user.getId().equals(room.getHotel().getOwner().getId())) {
+            throw new AccessDeniedException("You are not the owner of room with id: " + roomId); // Validates room ownership
+        }
+
+        return inventoryRepository.findByRoomOrderByDate(room)
+                .stream()
+                .map(inventory ->
+                        modelMapper.map(inventory, InventoryDto.class))        // Converts inventory entities into DTOs
+                .collect(Collectors.toList());
+    }
+
+    // Updates inventory settings for a room within a date range
+    @Override
+    @Transactional
+    public void updateInventory(Long roomId, UpdateInventoryRequestDto updateInventoryRequestDto) {
+
+        log.info("Updating All inventory by room for room with id: {} between date range: {} - {}",
+                roomId,
+                updateInventoryRequestDto.getStartDate(),
+                updateInventoryRequestDto.getEndDate());                       // Logs inventory update request
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + roomId)); // Fetches room or throws exception
+
+        User user = getCurrentUser();                                          // Retrieves currently authenticated user
+
+        if (!user.getId().equals(room.getHotel().getOwner().getId()))
+            throw new AccessDeniedException("You are not the owner of room with id: " + roomId); // Validates room ownership
+
+        inventoryRepository.getInventoryAndLockBeforeUpdate(
+                roomId,
+                updateInventoryRequestDto.getStartDate(),
+                updateInventoryRequestDto.getEndDate()
+        );                                                                     // Locks inventory records before update
+
+        inventoryRepository.updateInventory(
+                roomId,
+                updateInventoryRequestDto.getStartDate(),
+                updateInventoryRequestDto.getEndDate(),
+                updateInventoryRequestDto.getClosed(),
+                updateInventoryRequestDto.getSurgeFactor()
+        );                                                                     // Updates inventory availability and surge factor
+    }
 }
 
 /*
     InventoryServiceImpl
 
-        Purpose : Manages inventory-related business operations.
-                  Handles inventory creation, deletion, and hotel search.
+        Purpose :
+            Handles inventory management, inventory updates,
+            and hotel search operations.
 
         Responsibilities :
-            - Generate inventory records
-            - Delete inventory records
+            - Generate room inventory
+            - Delete room inventory
             - Search hotels
+            - Retrieve inventory details
+            - Update inventory settings
+            - Validate room ownership
+            - Manage inventory pricing
             - Manage room availability
 
         Methods :
 
             initializeRoomForAYear()
-                - Creates inventory for next 1 year
-                - Generates one inventory record per day
-                - Initializes room availability and pricing
+                - Creates inventory records for one year
+                - Initializes pricing and availability
+                - Creates one inventory record per day
 
             deleteFutureInventories()
                 - Deletes inventory associated with a room
 
             searchHotels()
                 - Searches hotels by city
-                - Filters hotels by date range
-                - Returns hotel pricing information
-                - Supports pagination
+                - Filters by date range
+                - Filters by room count
+                - Returns paginated results
 
-        Business Use :
-            - Maintains day-wise room inventory.
-            - Supports hotel availability management.
-            - Provides hotel search functionality.
-            - Supplies inventory data for bookings.
-            - Uses pre-calculated hotel pricing for faster searches.
+            getAllInventoryByRoom()
+                - Retrieves inventory of a room
+                - Validates room ownership
 
-        Search Flow :
+            updateInventory()
+                - Updates inventory configuration
+                - Updates surge pricing
+                - Updates booking availability
+                - Locks inventory before update
+
+        Inventory Lifecycle :
+
+            Room Created
+                    ↓
+        initializeRoomForAYear()
+                    ↓
+          Daily Inventory Records
+                    ↓
+             Available For Booking
+
+        Hotel Search Flow :
 
             Guest Search Request
                     ↓
@@ -120,41 +201,108 @@ public class InventoryServiceImpl implements InventoryService {
                     +
               Required Rooms
                     ↓
-            HotelMinPrice Search
+         Hotel Availability Search
                     ↓
-            Average Hotel Price
+          HotelMinPriceRepository
                     ↓
-            HotelPriceDto Page
+            Matching Hotels
+                    ↓
+             API Response
 
-        Inventory Generation Flow :
+        Inventory Retrieval Flow :
 
-            Room Created
+            Hotel Manager
                     ↓
-            initializeRoomForAYear()
+            Room Selection
                     ↓
-            Create Inventory
-              For Each Day
+        Ownership Validation
                     ↓
-               Next 366 Days
+            Fetch Inventory
+                    ↓
+            InventoryDto List
+                    ↓
+             API Response
 
-        Example :
+        Inventory Update Flow :
 
-            Room Created
+            Hotel Manager
                     ↓
-            Inventory Generated
+            Select Room
                     ↓
-            04 Jun 2026
-            05 Jun 2026
-            06 Jun 2026
-            ...
-            03 Jun 2027
+            Select Date Range
+                    ↓
+        Ownership Validation
+                    ↓
+            Lock Inventory
+                    ↓
+          Update Inventory
+                    ↓
+             Commit Changes
+
+        Pricing Flow :
+
+            Base Room Price
+                    ↓
+             Surge Factor
+                    ↓
+             Final Price
+                    ↓
+           Search Results
+
+        Availability Flow :
+
+            closed = false
+                    ↓
+            Accept Bookings
+
+            closed = true
+                    ↓
+            Reject Bookings
+
+        Ownership Validation Flow :
+
+            Authenticated User
+                    ↓
+            Room Owner Check
+                    ↓
+            Access Granted / Denied
+
+        Business Use :
+            - Hotel search
+            - Inventory management
+            - Dynamic pricing
+            - Room availability management
+            - Hotel manager operations
+            - Booking preparation
+
+        Security Features :
+            - Room ownership validation
+            - Access control enforcement
+            - Pessimistic inventory locking
+            - Transaction-safe inventory updates
 
         Note :
-            - One inventory record exists for each
-              Hotel + Room + Date combination.
-            - Search uses HotelMinPrice table for better performance.
+            - Inventory is generated for one year.
+            - One inventory record exists per room per day.
             - Search results are paginated.
-            - Inventory stores availability and pricing information.
+            - Inventory updates are performed inside transactions.
+            - Inventory records are locked before updates.
+            - Hotel search uses HotelMinPriceRepository for optimized performance.
+            - Only room owners can manage inventory.
 
-        This class acts as the business layer for inventory management and hotel search.
+        Data Relationships :
+
+            Hotel
+                ↓
+              Room
+                ↓
+           Inventory
+                ↓
+         Availability
+                +
+             Pricing
+
+        This service acts as the central
+        inventory management and hotel
+        search component of the application.
 */

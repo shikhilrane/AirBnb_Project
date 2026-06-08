@@ -15,100 +15,117 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping(path = "/hotels")
+@RequestMapping(path = "/searchHotels")
 @Validated
 public class HotelSearchGuestController {
 
     private final InventoryService inventoryService;
     private final HotelService hotelService;
 
-    // 1. Search hotels based on city, dates, room count, and pricing
+    // Searches hotels based on city, dates, room count, and pricing
     @GetMapping(path = "/search")
     public ResponseEntity<Page<HotelPriceDto>> searchHotels(@Valid @RequestBody HotelSearchReuestDto hotelSearchReuestDto) {
-        var page = inventoryService.searchHotels(hotelSearchReuestDto);   // Searches hotels and returns pricing information
-        return ResponseEntity.ok(page);                                   // Returns paginated hotel list with prices
+        var page = inventoryService.searchHotels(hotelSearchReuestDto);   // Searches hotels and calculates pricing information
+        return ResponseEntity.ok(page);                                   // Returns paginated hotel search results
     }
 
-    // 2. Get complete hotel information by hotel ID
+    // Retrieves complete hotel information by hotel ID
     @GetMapping(path = "/{hotelId}/info")
     public ResponseEntity<HotelInfoDto> getHotelInfo(@PathVariable Long hotelId){
-        return ResponseEntity.ok(hotelService.getHotelInfoById(hotelId));                                           // Fetches detailed hotel information
+        return ResponseEntity.ok(hotelService.getHotelInfoById(hotelId)); // Fetches detailed hotel and room information
     }
 }
 
 /*
     HotelSearchGuestController
 
-        Purpose : Handles hotel search and hotel information APIs for guest users.
+        Purpose :
+            Handles hotel search and hotel information APIs for guest users.
 
         Responsibilities :
             - Search available hotels
             - View hotel details
-            - Return hotel pricing information
+            - View hotel pricing information
+            - Support hotel booking discovery
 
         Endpoints :
 
-            GET /hotels/search
+            GET /searchHotels/search
                 - Searches hotels based on:
                     • City
                     • Check-in date
                     • Check-out date
                     • Required room count
-                - Returns hotel details with average pricing
+                    • Guest requirements
+                - Returns hotels with pricing information
 
-            GET /hotels/{hotelId}/info
+            GET /searchHotels/{hotelId}/info
                 - Returns complete hotel information
                 - Returns room details
+                - Returns hotel metadata
 
-        Flow :
+        Hotel Search Flow :
 
-            Guest Request
-                  ↓
-            Controller
-                  ↓
-            Service Layer
-                  ↓
-            Repository Layer
-                  ↓
-            Database
-
-        Example :
-
-            Search Hotels
-                GET /hotels/search
-
-            Response :
-
-                Hotel Name : Hotel Lotus
-                Price      : ₹575
-
-            Get Hotel Details
-                GET /hotels/1/info
-
-        Business Use :
-            - Allows guests to search hotels.
-            - Displays hotel pricing information.
-            - Displays hotel and room details.
-            - Supports hotel booking flow.
-
-        Search Flow :
-
-            City + Dates + Rooms
+            Guest Search Request
                     ↓
-            Hotel Search
+            Search Criteria Validation
                     ↓
-            HotelMinPrice
+            Inventory Availability Check
                     ↓
-            HotelPriceDto
+            Hotel Matching
+                    ↓
+            Price Calculation
+                    ↓
+            Paginated Results
                     ↓
             API Response
 
+        Hotel Information Flow :
+
+            Guest Requests Hotel Details
+                        ↓
+            Hotel Lookup
+                        ↓
+            Room Information Fetch
+                        ↓
+            Hotel Information DTO
+                        ↓
+            API Response
+
+        Search Parameters :
+
+            City
+                - Destination city
+
+            Check-In Date
+                - Booking start date
+
+            Check-Out Date
+                - Booking end date
+
+            Room Count
+                - Number of rooms required
+
+        Business Use :
+            - Hotel discovery
+            - Price comparison
+            - Booking planning
+            - Room availability checking
+            - Hotel information browsing
+
+        Security Features :
+            - Request validation
+            - Controlled data exposure
+            - Availability-based search results
+
         Note :
             - Search results are paginated.
-            - Only active hotels are returned.
-            - Pricing is fetched from HotelMinPrice table.
-            - Controller contains no business logic.
+            - Only eligible hotels are returned.
+            - Pricing information is included in search results.
+            - Detailed hotel information is available through a separate endpoint.
+            - Controller delegates all business logic to service layers.
 
-        This controller is responsible for hotel search
-        and hotel information APIs.
+        This controller acts as the primary
+        hotel discovery and search entry point
+        for guest users.
 */

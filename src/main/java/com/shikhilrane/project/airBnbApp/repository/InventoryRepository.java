@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -123,145 +124,179 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
                      @Param("startDate") LocalDate startDate,
                      @Param("endDate") LocalDate endDate,
                      @Param("numberOfRooms") int numberOfRooms);
+
+    // Updates future inventory prices when room base price changes
+    @Modifying
+    @Query("""
+             UPDATE Inventory i
+             SET i.price = :newBasePrice * i.surgeFactor
+             WHERE i.room.id = :roomId
+             AND i.date >= :today
+          """)
+    void updateFutureInventoryPrices(
+            @Param("roomId") Long roomId,
+            @Param("newBasePrice") BigDecimal newBasePrice,
+            @Param("today") LocalDate today
+    );
+
+    // Retrieves all inventory records of a room ordered by date
+    List<Inventory> findByRoomOrderByDate(Room room);
+
+    // Retrieves and locks inventory records before inventory updates
+    @Query("""
+                SELECT i
+                FROM Inventory i
+                WHERE i.room.id = :roomId
+                  AND i.date BETWEEN :startDate AND :endDate
+            """)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Inventory> getInventoryAndLockBeforeUpdate(@Param("roomId") Long roomId,
+                                                    @Param("startDate") LocalDate startDate,
+                                                    @Param("endDate") LocalDate endDate);
+
+    // Updates inventory availability and surge pricing for a date range
+    @Modifying
+    @Query("""
+                UPDATE Inventory i
+                SET i.surgeFactor = :surgeFactor,
+                    i.closed = :closed
+                WHERE i.room.id = :roomId
+                  AND i.date BETWEEN :startDate AND :endDate
+            """)
+    void updateInventory(@Param("roomId") Long roomId,
+                         @Param("startDate") LocalDate startDate,
+                         @Param("endDate") LocalDate endDate,
+                         @Param("closed") boolean closed,
+                         @Param("surgeFactor") BigDecimal surgeFactor);
 }
 
 /*
     InventoryRepository
 
         Purpose :
-            Provides database operations
-            for Inventory records.
+            Provides database access operations
+            for Inventory entities.
 
         Responsibilities :
-            - Save inventory records
-            - Delete inventory records
+            - Manage room inventory
             - Search hotel availability
-            - Lock inventory during booking
             - Reserve inventory
-            - Confirm inventory
+            - Confirm bookings
             - Release inventory
+            - Update pricing
             - Prevent overbooking
-            - Fetch inventory for pricing updates
+            - Support inventory reporting
 
         Methods :
 
             deleteByRoom()
-                - Deletes all inventory records
-                  associated with a room
+                - Deletes inventory records of a room
 
             findHotelsWithAvailableInventory()
-                - Finds hotels having available rooms
-                - Checks availability for complete stay duration
-                - Returns paginated hotel list
+                - Finds hotels with available inventory
+                - Supports hotel search
 
             findAndLockAvailableInventory()
-                - Finds available inventory records
-                - Locks inventory during booking
-                - Prevents overbooking
+                - Retrieves and locks inventory
+                - Prevents concurrent booking conflicts
 
             findByHotelAndDateBetween()
-                - Fetches inventory records
-                  for a hotel and date range
-                - Used by pricing scheduler
+                - Retrieves inventory for reporting and pricing
 
             findAndLockReservedInventory()
-                - Finds reserved inventory records
-                - Locks inventory before confirmation
-                - Locks inventory before cancellation
+                - Locks inventory before confirmation or cancellation
 
             confirmBooking()
-                - Converts reserved rooms into booked rooms
-                - Called after successful payment
+                - Converts reserved inventory into booked inventory
 
             cancelBooking()
-                - Releases booked rooms
-                - Called during booking cancellation
+                - Releases booked inventory
 
             initBooking()
-                - Reserves rooms during booking initialization
-                - Executed before payment completion
+                - Reserves inventory before payment completion
+
+            updateFutureInventoryPrices()
+                - Recalculates future inventory pricing
+
+            findByRoomOrderByDate()
+                - Retrieves room inventory ordered by date
+
+            getInventoryAndLockBeforeUpdate()
+                - Locks inventory before bulk updates
+
+            updateInventory()
+                - Updates surge pricing and availability status
 
         Inventory Lifecycle :
 
-            Available Room
-                    ↓
-              initBooking()
-                    ↓
-               Reserved
-                    ↓
-         Payment Success
-                    ↓
-            confirmBooking()
-                    ↓
-                Booked
+            Available
+                ↓
+            initBooking()
+                ↓
+            Reserved
+                ↓
+        Payment Success
+                ↓
+        confirmBooking()
+                ↓
+             Booked
 
             OR
 
-               Reserved
-                    ↓
-        Session Expired
-                    ↓
-             Cancelled
-                    ↓
-             Available
+             Booked
+                ↓
+        cancelBooking()
+                ↓
+            Available
 
-            OR
+        Hotel Search Flow :
 
-                Booked
+            Search Request
                     ↓
-           cancelBooking()
+            City + Dates + Rooms
                     ↓
-             Available
-
-        Booking Flow :
-
-            Search Room
+        findHotelsWithAvailableInventory()
                     ↓
-         Lock Inventory
+            Matching Hotels
                     ↓
-          Reserve Room
-                    ↓
-          Stripe Payment
-                    ↓
-         Confirm Booking
-                    ↓
-             Stay Date
-
-        Business Use :
-            - Room availability management
-            - Hotel search
-            - Booking creation
-            - Booking confirmation
-            - Booking cancellation
-            - Dynamic pricing support
-            - Inventory reservation
-            - Overbooking prevention
+            API Response
 
         Concurrency Protection :
 
             User A Books Room
                     ↓
-             Inventory Locked
+            Inventory Locked
                     ↓
-             User B Waits
+            User B Waits
                     ↓
-          Prevents Overbooking
+            No Overbooking
 
         Security Features :
             - Pessimistic row locking
             - Transaction-safe inventory updates
             - Concurrent booking protection
-            - Consistent inventory management
+            - Consistent inventory state management
+
+        Business Use :
+            - Hotel search
+            - Booking creation
+            - Booking confirmation
+            - Booking cancellation
+            - Inventory management
+            - Dynamic pricing
+            - Revenue optimization
 
         Note :
-            - Uses PESSIMISTIC_WRITE locks.
-            - Inventory updates run inside transactions.
-            - Reserved inventory is confirmed after payment success.
+            - Uses PESSIMISTIC_WRITE locks where required.
+            - Supports transaction-safe inventory operations.
+            - Inventory reservation occurs before payment.
+            - Confirmed bookings consume inventory.
             - Cancelled bookings release inventory.
-            - Inventory remains consistent under concurrent requests.
+            - Pricing updates affect future inventory only.
 
-        This repository acts as the data access layer
-        for inventory availability and booking management.
+        This repository acts as the central
+        inventory management and availability
+        data access layer of the application.
 */
 
 /*

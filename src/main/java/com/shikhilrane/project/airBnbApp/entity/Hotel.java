@@ -42,7 +42,7 @@ public class Hotel {
     @Column(nullable = false)
     private Boolean active;                 // This will signify that if hotel is active or not
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(optional = false)
     private User owner;                     // User who owns and manages this hotel
 
     @OneToMany(mappedBy = "hotel")

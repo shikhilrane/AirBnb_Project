@@ -7,6 +7,7 @@ import com.shikhilrane.project.airBnbApp.entity.User;
 import com.shikhilrane.project.airBnbApp.exception.ResourceNotFoundException;
 import com.shikhilrane.project.airBnbApp.exception.UnAuthorisedException;
 import com.shikhilrane.project.airBnbApp.repository.HotelRepository;
+import com.shikhilrane.project.airBnbApp.repository.InventoryRepository;
 import com.shikhilrane.project.airBnbApp.repository.RoomRepository;
 import com.shikhilrane.project.airBnbApp.service.InventoryService;
 import com.shikhilrane.project.airBnbApp.service.RoomService;
@@ -17,8 +18,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static com.shikhilrane.project.airBnbApp.util.AppUtils.getCurrentUser;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +33,7 @@ public class RoomServiceImpl implements RoomService {
     private final HotelRepository hotelRepository;      // Performs hotel database operations
     private final InventoryService inventoryService;    // Manages room inventory operations
     private final ModelMapper modelMapper;              // Converts DTOs into entities and vice versa
+    private final InventoryRepository inventoryRepository;     // Performs inventory database operations
 
     // Creates a new room inside a hotel after validating hotel ownership
     @Override
@@ -107,145 +113,184 @@ public class RoomServiceImpl implements RoomService {
         inventoryService.deleteFutureInventories(room);                             // Deletes inventory records associated with room
         roomRepository.deleteById(roomId);                                          // Deletes room from database
     }
+
+    // Updates room details after validating hotel and room ownership
+    @Override
+    @Transactional
+    public RoomDto updateRoomById(Long hotelId, Long roomId, RoomDto roomDto) {
+
+        log.info("Updating the room with ID: {}", roomId);                    // Logs room update request
+
+        Hotel hotel = hotelRepository
+                .findById(hotelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: " + hotelId)); // Fetches hotel or throws exception
+
+        User user = getCurrentUser();                                          // Retrieves currently authenticated user
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found with ID: " + roomId)); // Fetches room or throws exception
+
+        if (!room.getHotel().getId().equals(hotelId)) {
+            throw new IllegalStateException("Room does not belong to hotel with id: " + hotelId); // Validates hotel-room association
+        }
+
+        if (!user.getId().equals(room.getHotel().getOwner().getId())) {
+            throw new UnAuthorisedException("This user does not own this hotel with id: " + hotelId); // Validates hotel ownership
+        }
+
+        BigDecimal oldBasePrice = room.getBasePrice();                         // Stores existing room base price
+
+        modelMapper.map(roomDto, room);                                        // Maps updated room details
+        room.setId(roomId);                                                    // Preserves existing room identifier
+
+        if (oldBasePrice.compareTo(room.getBasePrice()) != 0) {
+
+            inventoryRepository.updateFutureInventoryPrices(
+                    roomId,
+                    room.getBasePrice(),
+                    LocalDate.now()
+            );                                                                 // Updates future inventory prices if base price changes
+        }
+
+        room = roomRepository.save(room);                                      // Persists updated room
+
+        return modelMapper.map(room, RoomDto.class);                           // Converts entity into DTO
+    }
 }
 
 
 /*
     RoomServiceImpl
 
-    Purpose : Handles room-related business operations.
-              Acts as a bridge between the Controller and Repository layers.
+        Purpose :
+            Handles room management operations.
+            Manages room lifecycle, ownership validation,
+            inventory generation, and room updates.
 
-    Responsibilities :
-        - Create rooms inside hotels
-        - Fetch hotel rooms
-        - Fetch room details
-        - Delete rooms
-        - Generate room inventory
-        - Validate hotel ownership
-        - Validate room ownership
+        Responsibilities :
+            - Create rooms inside hotels
+            - Fetch hotel rooms
+            - Fetch room details
+            - Update room details
+            - Delete rooms
+            - Generate room inventory
+            - Synchronize inventory pricing
+            - Validate hotel ownership
+            - Validate room ownership
 
-    Methods :
+        Methods :
 
-        createNewRoom()
-            - Creates a room inside a hotel
-            - Verifies hotel ownership
-            - Generates inventory if hotel is active
+            createNewRoom()
+                - Creates room inside hotel
+                - Validates hotel ownership
+                - Generates inventory for active hotels
 
-        getAllRoomsInHotel()
-            - Fetches all rooms belonging to a hotel
-            - Verifies hotel ownership
+            getAllRoomsInHotel()
+                - Retrieves all rooms of a hotel
+                - Validates hotel ownership
 
-        getRoomById()
-            - Fetches room details using room ID
-            - Verifies room ownership
-            - Returns room information
+            getRoomById()
+                - Retrieves room details
+                - Validates room ownership
 
-        deleteRoomById()
-            - Verifies room ownership
-            - Deletes associated inventories
-            - Deletes room from database
+            deleteRoomById()
+                - Deletes room inventories
+                - Deletes room
+                - Validates room ownership
 
-    Business Use :
-        - Allows HOTEL_MANAGER to manage rooms
-        - Supports room creation and deletion
-        - Supports room information retrieval
-        - Supports hotel inventory generation
-        - Maintains room availability lifecycle
-        - Prevents unauthorized room access
-        - Ensures only hotel owners manage rooms
+            updateRoomById()
+                - Updates room information
+                - Validates hotel ownership
+                - Validates room ownership
+                - Validates room belongs to hotel
+                - Synchronizes future inventory pricing
+                - Saves updated room
 
-    Room Lifecycle :
+        Room Lifecycle :
 
-        Room Created
-                ↓
-           Assigned To
-              Hotel
-                ↓
-         Hotel Activated
-                ↓
-       Inventory Generated
-                ↓
-      Available For Booking
+            Room Created
+                    ↓
+            Assigned To Hotel
+                    ↓
+            Hotel Activated
+                    ↓
+            Inventory Generated
+                    ↓
+            Available For Booking
+                    ↓
+            Room Updated
+                    ↓
+            Inventory Price Sync
 
-        OR
+            OR
 
-        Room Deleted
-                ↓
-      Inventory Deleted
-                ↓
-        Room Removed
+            Room Deleted
+                    ↓
+            Inventory Deleted
+                    ↓
+            Room Removed
 
-    Room Ownership Flow :
+        Room Update Flow :
 
-        HOTEL_MANAGER Login
-                ↓
-           Select Hotel
-                ↓
-        Ownership Check
-                ↓
-          Create Room
-                ↓
-       Inventory Generated
-                ↓
-         Manage Room
-                ↓
-          Delete Room
+            Update Request
+                    ↓
+            Ownership Validation
+                    ↓
+            Hotel-Room Validation
+                    ↓
+            Update Room
+                    ↓
+            Base Price Changed?
+                  ↓      ↓
+                Yes      No
+                 ↓        ↓
+          Update Inventory
+                 ↓
+             Save Room
 
-        OR
+        Ownership Validation Flow :
 
-        HOTEL_MANAGER Login
-                ↓
-          Select Room
-                ↓
-        Ownership Check
-                ↓
-        View Room Details
+            Authenticated User
+                    ↓
+              Fetch Owner
+                    ↓
+               Compare IDs
+                    ↓
+            Access Granted / Denied
 
-    Authorization Rules :
+        Inventory Generation Flow :
 
-        Hotel Owner
-                ↓
-        Can Create Rooms
+            Active Hotel
+                    ↓
+              Room Created
+                    ↓
+        initializeRoomForAYear()
+                    ↓
+         Daily Inventory Records
+                    ↓
+              Next 365 Days
 
-        Can View Rooms
+        Security Features :
+            - Hotel ownership validation
+            - Room ownership validation
+            - Unauthorized access prevention
+            - Access control enforcement
 
-        Can View Room Details
+        Business Use :
+            - Room management
+            - Hotel administration
+            - Inventory generation
+            - Room pricing management
+            - Inventory price synchronization
 
-        Can Delete Rooms
+        Note :
+            - Only hotel owners can manage rooms.
+            - Inventory is automatically generated for active hotels.
+            - Updating room base price updates future inventory pricing.
+            - Inventory generation is delegated to InventoryService.
+            - Inventory pricing synchronization is delegated to InventoryRepository.
 
-        Other Users
-                ↓
-        Access Denied
-
-    Inventory Generation Flow :
-
-        Active Hotel
-                ↓
-          Room Created
-                ↓
-    initializeRoomForAYear()
-                ↓
-     Create Daily Inventory
-                ↓
-         Next 365 Days
-
-    Security Features :
-        - Hotel ownership validation
-        - Room ownership validation
-        - Unauthorized access prevention
-        - Role-based access control
-        - Secure room management
-
-    Note :
-        - Only hotel owners can create rooms.
-        - Only hotel owners can view hotel rooms.
-        - Only hotel owners can view room details.
-        - Only hotel owners can delete rooms.
-        - Inventory is automatically generated for active hotels.
-        - Room deletion removes associated inventory records.
-        - Inventory generation is delegated to InventoryService.
-
-    This class acts as the business layer
-    for room management.
+        This service acts as the central
+        room management component
+        of the application.
 */

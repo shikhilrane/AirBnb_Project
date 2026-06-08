@@ -3,6 +3,7 @@ package com.shikhilrane.project.airBnbApp.service.impl;
 import com.shikhilrane.project.airBnbApp.dto.BookingDto;
 import com.shikhilrane.project.airBnbApp.dto.BookingRequest;
 import com.shikhilrane.project.airBnbApp.dto.GuestDto;
+import com.shikhilrane.project.airBnbApp.dto.HotelReportDto;
 import com.shikhilrane.project.airBnbApp.entity.*;
 import com.shikhilrane.project.airBnbApp.entity.enums.BookingStatus;
 import com.shikhilrane.project.airBnbApp.exception.ResourceNotFoundException;
@@ -20,14 +21,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -103,41 +109,42 @@ public class BookingServiceImpl implements BookingService {
     // Adds guests to an existing booking
     @Override
     @Transactional
-    public BookingDto addGuests(Long bookingId, List<GuestDto> guestDtoList) {
+    public BookingDto addGuests(Long bookingId, List<Long> guestIds) {
         log.info("Adding guests for booking with id: {}", bookingId);
 
-        Booking booking = bookingRepository.findById(bookingId).orElseThrow(() ->
-                new ResourceNotFoundException("Booking not found with id: "+bookingId));                // Fetches booking or throws exception
-        User user = getCurrentUser();                                                                   // Fetches currently logged-in user from Security Context
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
 
-        // Verifies that booking belongs to the current user
+        User user = getCurrentUser();
+
         if (!user.getId().equals(booking.getUser().getId())) {
-            throw new UnAuthorisedException("Booking does not belong to this user with id: "+user.getId()); // Prevents users from accessing bookings owned by other users
+            throw new UnAuthorisedException("Booking does not belong to this user with id: " + user.getId());
         }
 
-        // Checks whether booking reservation has expired
         if (hasBookingExpired(booking)) {
-            throw new IllegalStateException("Booking has already expired");                             // Prevents adding guests to expired booking
+            throw new IllegalStateException("Booking has already expired");
         }
 
-        // Allows guest addition only when booking is in RESERVED state
-        if(booking.getBookingStatus() != BookingStatus.RESERVED) {
-            throw new IllegalStateException("Booking is not under reserved state, cannot add guests");  // Allows guest addition only for RESERVED bookings
+        if (booking.getBookingStatus() != BookingStatus.RESERVED) {
+            throw new IllegalStateException("Booking is not under reserved state");
         }
 
-        // Adds all guests to the booking
-        for (GuestDto guestDto : guestDtoList) {
-            Guest guest = modelMapper.map(guestDto, Guest.class);                    // Converts DTO to Entity
-            guest.setUser(user);                                                     // Associates guest with current user
-            guest = guestRepository.save(guest);                                     // Saves guest
-            booking.getGuests().add(guest);                                          // Associates guest with booking
+        for (Long guestId : guestIds) {
+            Guest guest = guestRepository.findById(guestId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Guest not found with id: " + guestId));
+
+            if (!guest.getUser().getId().equals(user.getId())) {
+                throw new UnAuthorisedException("Guest does not belong to current user");
+            }
+
+            booking.getGuests().add(guest);
         }
 
-        booking.setBookingStatus(BookingStatus.GUESTS_ADDED);                        // Updates booking status
+        booking.setBookingStatus(BookingStatus.GUESTS_ADDED);
 
-        booking = bookingRepository.save(booking);                                   // Saves updated booking
+        booking = bookingRepository.save(booking);
 
-        return modelMapper.map(booking, BookingDto.class);                           // Converts Booking to DTO
+        return modelMapper.map(booking, BookingDto.class);
     }
 
     // Creates Stripe checkout session and moves booking to payment pending state
@@ -342,6 +349,7 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
+    // Returns current status of a booking after ownership validation
     @Override
     public BookingStatus getBookingStatus(Long bookingId) {
         Booking booking = bookingRepository
@@ -349,23 +357,102 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: "+bookingId));
 
         User user = getCurrentUser();
+
         if (!user.getId().equals(booking.getUser().getId())) {
             throw new UnAuthorisedException("Booking does not belong to this user with id: "+user.getId());
         }
 
-        return booking.getBookingStatus();
+        return booking.getBookingStatus();     // Returns current booking status
+    }
+
+    // Retrieves all bookings associated with a hotel
+    @Override
+    public List<BookingDto> getAllBookingsByHotelId(Long hotelId) {
+
+        Hotel hotel = hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: "+hotelId));
+
+        User user = getCurrentUser();
+
+        log.info("Getting all booking for the hotel with ID: {}", hotelId);    // Logs booking retrieval request
+
+        if(!user.getId().equals(hotel.getOwner().getId()))
+            throw new AccessDeniedException("You are not the owner of hotel with id: "+hotelId);
+
+        List<Booking> bookings = bookingRepository.findByHotel(hotel);          // Retrieves hotel bookings
+
+        return bookings.stream()
+                .map((element) -> modelMapper.map(element, BookingDto.class))   // Converts entities to DTOs
+                .collect(Collectors.toList());
+    }
+
+    // Generates booking and revenue report for a hotel
+    @Override
+    public HotelReportDto getHotelReport(Long hotelId, LocalDate startDate, LocalDate endDate) {
+
+        Hotel hotel = hotelRepository.findById(hotelId)
+                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: "+hotelId));
+
+        User user = getCurrentUser();
+
+        log.info("Generating report for hotel with ID: {}", hotelId);           // Logs report generation request
+
+        if(!user.getId().equals(hotel.getOwner().getId()))
+            throw new AccessDeniedException("You are not the owner of hotel with id: "+hotelId);
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();                 // Converts start date to start of day
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);              // Converts end date to end of day
+
+        List<Booking> bookings = bookingRepository.findByHotelAndCreatedAtBetween(
+                hotel, startDateTime, endDateTime);                             // Retrieves bookings within date range
+
+        Long totalConfirmedBookings = bookings.stream()
+                .filter(booking -> booking.getBookingStatus() == BookingStatus.CONFIRMED)
+                .count();                                                       // Counts confirmed bookings
+
+        BigDecimal totalRevenueOfConfirmedBookings = bookings.stream()
+                .filter(booking -> booking.getBookingStatus() == BookingStatus.CONFIRMED)
+                .map(Booking::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);                      // Calculates total revenue
+
+        BigDecimal avgRevenue = totalConfirmedBookings == 0
+                ? BigDecimal.ZERO
+                : totalRevenueOfConfirmedBookings.divide(
+                BigDecimal.valueOf(totalConfirmedBookings),
+                RoundingMode.HALF_UP
+        );                                                              // Calculates average revenue
+
+        return new HotelReportDto(
+                totalConfirmedBookings,
+                totalRevenueOfConfirmedBookings,
+                avgRevenue
+        );
+    }
+
+    // Retrieves booking history of the currently authenticated user
+    @Override
+    public List<BookingDto> getMyBookings() {
+
+        User user = getCurrentUser();                                           // Retrieves logged-in user
+
+        return bookingRepository.findByUser(user)
+                .stream()
+                .map((element) -> modelMapper.map(element, BookingDto.class))   // Converts bookings to DTOs
+                .collect(Collectors.toList());
     }
 
     // Checks whether reservation has expired
     public boolean hasBookingExpired(Booking booking) {
         return booking.getCreatedAt()
                 .plusMinutes(10)
-                .isBefore(LocalDateTime.now());                                      // Checks if reservation expired after 10 minutes
+                .isBefore(LocalDateTime.now());                                 // Reservation expires after 10 minutes
     }
 
-    // Returns currently logged-in user
+    // Returns currently authenticated user from Spring Security context
     public User getCurrentUser() {
-        return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return (User) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();                                                // Extracts authenticated user
     }
 }
 
@@ -388,6 +475,7 @@ public class BookingServiceImpl implements BookingService {
             - Validate booking ownership
             - Check booking expiration
             - Handle Stripe webhook events
+            - Generate hotel booking reports
 
         Methods :
 
@@ -425,8 +513,17 @@ public class BookingServiceImpl implements BookingService {
                 - Initiates refund
 
             getBookingStatus()
-                - Validates booking ownership
-                - Returns current booking status
+                - Returns booking status
+
+            getAllBookingsByHotelId()
+                - Retrieves hotel bookings
+                - Validates hotel ownership
+
+            getHotelReport()
+                - Generates booking and revenue report
+
+            getMyBookings()
+                - Retrieves current user's bookings
 
             hasBookingExpired()
                 - Checks whether booking expired
@@ -454,13 +551,21 @@ public class BookingServiceImpl implements BookingService {
                     ↓
                 CONFIRMED
 
-        Expiry Flow :
+        Reservation Expiry Flow :
+
+                RESERVED
+                    ↓
+       No Action For 10 Minutes
+                    ↓
+            Reservation Expired
+                    ↓
+          Payment Not Allowed
+
+        Stripe Expiry Flow :
 
             PAYMENTS_PENDING
                     ↓
-          No Payment For 24 Hours
-                    ↓
-      checkout.session.expired
+        checkout.session.expired
                     ↓
                 CANCELLED
                     ↓
@@ -538,6 +643,18 @@ public class BookingServiceImpl implements BookingService {
                     ↓
                 CANCELLED
 
+        Hotel Reporting Flow :
+
+            Hotel Manager
+                    ↓
+            Request Report
+                    ↓
+          Booking Repository
+                    ↓
+          Revenue Calculation
+                    ↓
+            HotelReportDto
+
         Business Use :
             - Hotel booking management
             - Guest management
@@ -546,14 +663,15 @@ public class BookingServiceImpl implements BookingService {
             - Payment processing
             - Refund processing
             - Booking tracking
+            - Hotel revenue reporting
             - Overbooking prevention
 
         Security Features :
             - Booking ownership validation
-            - Stripe webhook verification
             - Inventory locking
             - Transaction management
             - Secure refund processing
+            - Access control validation
 
         Note :
             - Uses PESSIMISTIC_WRITE locking.
@@ -564,8 +682,9 @@ public class BookingServiceImpl implements BookingService {
             - Payment processing is handled by Stripe Checkout.
             - Booking confirmation happens through webhooks.
             - Expired payment sessions automatically release inventory.
+            - Refunds are processed through Stripe.
 
-        This class acts as the central booking
-        and payment management service
-        of the application.
+        This class acts as the central booking,
+        payment, cancellation, and reporting
+        service of the application.
 */

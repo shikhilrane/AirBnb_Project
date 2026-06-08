@@ -1,9 +1,6 @@
 package com.shikhilrane.project.airBnbApp.controller;
 
-import com.shikhilrane.project.airBnbApp.dto.BookingDto;
-import com.shikhilrane.project.airBnbApp.dto.BookingRequest;
-import com.shikhilrane.project.airBnbApp.dto.BookingStatusResponseDto;
-import com.shikhilrane.project.airBnbApp.dto.GuestDto;
+import com.shikhilrane.project.airBnbApp.dto.*;
 import com.shikhilrane.project.airBnbApp.service.BookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,38 +17,38 @@ import java.util.Map;
 @Validated
 public class HotelBookingController {
 
-    private final BookingService bookingService;        // Handles booking, guest, payment and cancellation operations
+    private final BookingService bookingService;        // Handles booking lifecycle operations
 
     // 1. Initialize a new booking
     @PostMapping("/init")
     public ResponseEntity<BookingDto> initialiseBooking(@Valid @RequestBody BookingRequest bookingRequest){
-        return ResponseEntity.ok(bookingService.initialiseBooking(bookingRequest));
+        return ResponseEntity.ok(bookingService.initialiseBooking(bookingRequest));                     // Creates booking and reserves inventory
     }
 
     // 2. Add guests to an existing booking
     @PostMapping("/{bookingId}/addGuests")
-    public ResponseEntity<BookingDto> addGuests(@PathVariable Long bookingId, @Valid @RequestBody List<GuestDto> guestDtoList){
-        return ResponseEntity.ok(bookingService.addGuests(bookingId, guestDtoList));
+    public ResponseEntity<BookingDto> addGuests(@PathVariable Long bookingId, @RequestBody AddGuestsToBookingRequestDto requestDto) {
+        return ResponseEntity.ok(bookingService.addGuests(bookingId, requestDto.getGuestIds()));        // Associates guests with booking
     }
 
     // 3. Creates Stripe checkout session and returns payment URL
     @PostMapping("/{bookingId}/payments")
     public ResponseEntity<Map<String, String>> initiatePayment(@PathVariable Long bookingId) {
-        String sessionUrl = bookingService.initiatePayments(bookingId);             // Generates Stripe checkout session
-        return ResponseEntity.ok(Map.of("sessionUrl", sessionUrl));
+        String sessionUrl = bookingService.initiatePayments(bookingId);                                 // Generates Stripe checkout session
+        return ResponseEntity.ok(Map.of("sessionUrl", sessionUrl));                                 // Returns payment URL
     }
 
     // 4. Cancels an existing booking and triggers refund if applicable
     @PostMapping("/{bookingId}/cancel")
     public ResponseEntity<Void> cancelBooking(@PathVariable Long bookingId) {
-        bookingService.cancelBooking(bookingId);                                    // Cancels booking and releases inventory
-        return ResponseEntity.noContent().build();
+        bookingService.cancelBooking(bookingId);                                                        // Cancels booking and processes refund workflow
+        return ResponseEntity.noContent().build();                                                      // Returns successful cancellation response
     }
 
     // 5. Returns current booking status
     @GetMapping("/{bookingId}/status")
     public ResponseEntity<BookingStatusResponseDto> getBookingStatus(@PathVariable Long bookingId) {
-        return ResponseEntity.ok(new BookingStatusResponseDto(bookingService.getBookingStatus(bookingId)));
+        return ResponseEntity.ok(new BookingStatusResponseDto(bookingService.getBookingStatus(bookingId))); // Returns latest booking status
     }
 }
 
